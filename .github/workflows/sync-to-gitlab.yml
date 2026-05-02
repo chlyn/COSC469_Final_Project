@@ -17,5 +17,5 @@ jobs:
 
       - name: Push to GitLab
         run: |
-          git remote add gitlab https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/cosc480_group/COSC480_Final_Project.git
+          git remote add gitlab https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/cosc469_group/COSC469_Final_Project.git
           git push gitlab main --force

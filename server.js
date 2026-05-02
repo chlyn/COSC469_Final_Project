@@ -21,7 +21,7 @@ app.use(express.static(path.join(__dirname, "public")));                  // All
 app.use(express.json());                                                  // Allows express to read JSON request bodies (EX: fetching /api/login)
 
 // Sequelize database connection and models
-const { sequelize, User, PasswordResetCode } = require("./models");                             // Importing the Sequelize instance from the models folder (already configured using config.js and .env)
+const { sequelize, User, PasswordResetCode } = require("./models");       // Importing the Sequelize instance from the models folder (already configured using config.js and .env)
 
 // Testing the connection to the MySQL database
 sequelize.authenticate()
