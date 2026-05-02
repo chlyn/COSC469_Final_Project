@@ -1,4 +1,4 @@
-# COSC480 Final Project
+# COSC469 Final Project
 
 ---
 
@@ -17,7 +17,7 @@ Built with:
 ## 📚 Course & Team Information
 
 ### Course Details
-- **Course:** COSC 480-101
+- **Course:** COSC 469
 - **Instructor:** Dr. Appolo Tankeh
 - **Due Date:** May 5, 2026
 
@@ -62,8 +62,8 @@ You should see version numbers for both Node.js and npm.
 ### 3. Clone Repository
 
 ```bash
-git clone https://github.com/chlyn/COSC480_Final_Project.git
-cd COSC480_Final_Project
+git clone https://github.com/chlyn/COSC469_Final_Project.git
+cd COSC469_Final_Project
 ```
 
 ### 4. Install Project Dependencies
@@ -79,7 +79,7 @@ Create a `.env` file in the root directory and include the following:
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=yourpassword
-DB_NAME=cosc480_final_project_db
+DB_NAME=cosc469_final_project_db
 
 MAIL_USER=your_email@gmail.com
 MAIL_PASS=your_app_password
@@ -99,7 +99,7 @@ This project uses Gmail with Nodemailer to send emails (e.g., password reset cod
 > ##### Step 2: Generate an App Password
 > 
 > 1. Go to: https://myaccount.google.com/apppasswords
-> 2. Enter **App Name**: `COSC480: Final Project`
+> 2. Enter **App Name**: `COSC469: Final Project`
 > 3. Click **Create**
 > 4. Copy the generated 16-character app password
 > 
