@@ -30,3 +30,6 @@ coverage/
 # Optional IDE files
 .vscode/
 .idea/
+
+# Uploaded files
+uploads/

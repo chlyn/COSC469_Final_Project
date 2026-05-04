@@ -2,18 +2,20 @@
 <html lang="en">
 
     <head>
-        <title>Account Form</title>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap"/>
+        <title>SoftCare</title>
+        <link rel="icon" type="image/png" href="./assets/logo.svg" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"/>
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
         <link rel="stylesheet" href="style.css" />
     </head>
 
     <body>
 
-        <!-- BACKGROUND -->
-        <div id="background">
+        <div class="background-auth">
 
-            <!-------------------------------------------------------------------------------------------------------------------------->
+            <img src="./assets/left-bg.svg" class="auth-bg-graphic auth-bg-left" alt="" aria-hidden="true">
+            <img src="./assets/right-bg.svg" class="auth-bg-graphic auth-bg-right" alt="" aria-hidden="true"/>
+
             <!-- FORM -->
             <div class="form">
 
@@ -21,11 +23,9 @@
                 <div class="form-container">
 
                     <!-- FORM SUBTITLE -->
-                        <div class="form-subtitle">
-                            <h2>Peach Cart</h2>
-                        </div>
-
-
+                    <div class="form-subtitle">
+                        <h2>SoftCare</h2>
+                    </div>
 
                     <!------------------------------------------------------------------------------------------------------------------>
                     <!-- CREATE SECTION-->
@@ -78,64 +78,14 @@
                                 </div>
                             </label>
 
-                            <!-- MAJOR FIELD-->
+                            <!-- ACCOUNT TYPE FIELD-->
                             <label class="form-label">
-                                Major
+                                Account Type
                                 <div class="dropdown-field">
-                                    <select id="major" name="major" required>
-                                        <option value="">Select your major</option>
-                                        <option value="Computer Science">Computer Science</option>
-                                        <option value="Engineering">Engineering</option>
-                                        <option value="Business Administration">Business Administration</option>
-                                        <option value="Psychology">Psychology</option>
-                                        <option value="Biology">Biology</option>
-                                        <option value="Chemistry">Chemistry</option>
-                                        <option value="Physics">Physics</option>
-                                        <option value="Mathematics">Mathematics</option>
-                                        <option value="English">English</option>
-                                        <option value="History">History</option>
-                                        <option value="Political Science">Political Science</option>
-                                        <option value="Economics">Economics</option>
-                                        <option value="Sociology">Sociology</option>
-                                        <option value="Communication">Communication</option>
-                                        <option value="Art">Art</option>
-                                        <option value="Music">Music</option>
-                                        <option value="Nursing">Nursing</option>
-                                        <option value="Education">Education</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-
-                                    <div class="dropdown-icon">
-                                        <span class="material-icons">arrow_drop_down</span>
-                                    </div>
-
-                                </div>
-                            </label>
-
-                            <!-- MINOR FIELD-->
-                            <label class="form-label">
-                                Minor (Optional)
-                                <div class="dropdown-field">
-                                    <select id="minor" name="minor">
-                                        <option value="">None</option>
-                                        <option value="Computer Science">Computer Science</option>
-                                        <option value="Engineering">Engineering</option>
-                                        <option value="Business Administration">Business Administration</option>
-                                        <option value="Psychology">Psychology</option>
-                                        <option value="Biology">Biology</option>
-                                        <option value="Chemistry">Chemistry</option>
-                                        <option value="Physics">Physics</option>
-                                        <option value="Mathematics">Mathematics</option>
-                                        <option value="English">English</option>
-                                        <option value="History">History</option>
-                                        <option value="Political Science">Political Science</option>
-                                        <option value="Economics">Economics</option>
-                                        <option value="Sociology">Sociology</option>
-                                        <option value="Communication">Communication</option>
-                                        <option value="Art">Art</option>
-                                        <option value="Music">Music</option>
-                                        <option value="Nursing">Nursing</option>
-                                        <option value="Education">Education</option>
+                                    <select id="accountType" name="accountType" required>
+                                        <option value="">Select your account type</option>
+                                        <option value="Patient">Patient</option>
+                                        <option value="Healthcare Provider">Healthcare Provider</option>
                                         <option value="Other">Other</option>
                                     </select>
 
@@ -386,6 +336,63 @@
 
                     </section>
 
+
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-------------------------------------------------------------------------------------------------------------------------->
+        <!-- PATIENT PAGE -->
+        <div class="background patient hidden" id="home">
+
+            <!-- SUCCESS ALERT -->
+            <div class="alert success hidden toast" id="home-success">
+                <span class="material-icons">check_circle_outline</span>
+                <span class="msg-success-text"></span>
+            </div>
+
+            <!-------------------------------------------------------------------------------------------------------------------------->
+            <!-- SIDEBAR -->
+
+            <div class="sidebar">
+
+                <div class="logo">
+                    <span>SoftCare</span>
+                </div>
+
+                <nav class="nav">
+
+                    <button class="nav-btn active" data-target="my-records">
+                        <span class="material-icons">library_books</span>
+                        <span class="nav-text">My Records</span>
+                    </button>
+
+                    <button class="nav-btn" data-target="settings">
+                        <span class="material-icons">settings</span>
+                        <span class="nav-text">Settings</span>
+                    </button>
+                
+                </nav>
+
+                <div class="user-profile">
+
+                    <button class="profile-btn" id="sidebar-profile-btn">
+
+                        <div class="profile-img">
+                            <span>JD</span>
+                        </div>
+
+                        <div class="profile-info">
+                            <p class="profile-name">Jane Doe</p>
+                        </div>
+
+                    </button>
+
                 </div>
 
             </div>
@@ -393,66 +400,271 @@
 
 
             <!-------------------------------------------------------------------------------------------------------------------------->
-            <!-- HOME PAGE -->
-            <div class="content hidden" id="home">
+            <!-- CONTENT -->
 
-                <!-- SUCCESS ALERT -->
-                <div class="alert success hidden toast" id="home-success">
-                    <span class="material-icons">check_circle_outline</span>
-                    <span class="msg-success-text"></span>
+            <div class="content">
+
+                <div class="header">
+
+                    <div class="header-title">
+                        <h1>My Records</h1>
+                    </div>
+
+                    <button class="header-btn" id="upload-doc-btn">
+                        <span class="material-icons">add</span>
+                        Upload Document
+                    </button>
+
                 </div>
 
-                <!-- TOP BAR -->
-                <div class="topbar">
+                <div class="main-content">
 
-                    <h1 class="topbar-title" id="topbar-title">Welcome back, </h1>
+                    <div class="records-controls">
 
-                    <!-- USER PROFILE BUTTON -->
-                    <div class="user-profile">
+                        <label class="record-search">
+                            <span class="material-icons">search</span>
 
-                        <!-- PROFILE BUTTON -->
-                        <button class="profile-btn" id="profile-btn">
+                            <input type="search" id="record-search-input" placeholder="Search" />
 
-                            <!-- NAME & EMAIL -->
-                            <div class="profile-info">
-                                <p class="profile-name">Jane Doe</p>
-                                <p class="profile-email">doej0123</p>
+                            <button class="search-clear-btn hidden" type="button" id="search-clear-btn" aria-label="Clear search">
+                                <span class="material-icons">close</span>
+                            </button>
+                        </label>
+
+                        <label class="record-filter">
+                            <div class="type-filter">
+
+                                <button class="type-filter-btn" type="button" id="type-filter-btn">
+                                    <span class="type-filter-label" id="type-filter-label">All types</span>
+                                    <span class="material-icons">expand_more</span>
+                                </button>
+
+                                <div class="type-filter-menu hidden" id="type-filter-menu">
+                                    <button type="button" class="type-filter-option active" data-type="">All types</button>
+                                    <button type="button" class="type-filter-option" data-type="lab-report">Lab Report</button>
+                                    <button type="button" class="type-filter-option" data-type="prescription">Prescription</button>
+                                    <button type="button" class="type-filter-option" data-type="imaging">Imaging</button>
+                                    <button type="button" class="type-filter-option" data-type="visit-summary">Visit Summary</button>
+                                    <button type="button" class="type-filter-option" data-type="other">Other</button>
+                                </div>
+
+                            </div>
+                        </label>
+
+                        <div class="date-range-filter">
+
+                            <button class="date-range-btn" type="button" id="date-range-btn">
+                                <span id="date-range-label">Date Range</span>
+                                <span class="material-icons">calendar_today</span>
+                            </button>
+
+                            <div class="date-range-menu hidden" id="date-range-menu">
+
+                                <div class="date-calendar-header">
+                                    <button type="button" class="calendar-nav-btn" id="calendar-prev">
+                                        <span class="material-icons">chevron_left</span>
+                                    </button>
+
+                                    <span class="calendar-month" id="calendar-month">May 2026</span>
+
+                                    <button type="button" class="calendar-nav-btn" id="calendar-next">
+                                        <span class="material-icons">chevron_right</span>
+                                    </button>
+                                </div>
+
+                                <div class="date-range-inputs">
+                                    <input type="text" id="date-from" value="04/03/26" inputmode="numeric" placeholder="MM/DD/YY" pattern="\d{1,2}/\d{1,2}/\d{2}" />
+                                    <span>-</span>
+                                    <input type="text" id="date-to" value="05/03/26" inputmode="numeric" placeholder="MM/DD/YY" pattern="\d{1,2}/\d{1,2}/\d{2}" />
+                                </div>
+
+                                <div class="date-range-presets">
+                                    <button type="button" data-range="week">Last week</button>
+                                    <button type="button" data-range="month">Last month</button>
+                                    <button type="button" data-range="year">Last year</button>
+                                </div>
+
+                                <div class="date-calendar">
+                                    <div class="calendar-weekdays">
+                                        <span>Su</span>
+                                        <span>Mo</span>
+                                        <span>Tu</span>
+                                        <span>We</span>
+                                        <span>Th</span>
+                                        <span>Fr</span>
+                                        <span>Sa</span>
+                                    </div>
+
+                                    <div class="calendar-days" id="calendar-days"></div>
+                                </div>
+
+                                <div class="date-range-actions">
+                                    <button type="button" class="date-cancel-btn" id="date-cancel-btn">Cancel</button>
+                                    <button type="button" class="date-apply-btn" id="date-apply-btn">Apply</button>
+                                </div>
+
                             </div>
 
-                            <!-- INITIALS IMAGE -->
-                            <span class="profile-img">JD</span>
+                        </div>
 
+                        <button class="records-clear-btn hidden" type="button" id="records-clear-btn">
+                            <span class="material-icons">close</span>
+                            Clear
                         </button>
 
-                        <!-- PROFILE MENU -->
-                        <div class="profile-menu" id="profile-menu">
+                    </div>
 
-                            <button class="profile-menu-item">
-                                <span class="material-icons">person</span>
-                                Profile
-                            </button>
+                    <div class="records-table-list">
 
-                            <button class="profile-menu-item" id="signout-btn">
-                                <span class="material-icons">logout</span>
-                                Sign Out
-                            </button>
+                        <table class="records-table">
+                            <thead>
+                                <tr>
+                                    <th>
+                                        <button class="table-sort-btn" type="button" data-sort="document-name" data-direction="none">
+                                            <span>Document Name</span>
+                                            <span class="material-icons">unfold_more</span>
+                                        </button>
+                                    </th>
 
-                        </div>
+                                    <th>
+                                        <button class="table-sort-btn" type="button" data-sort="document-type" data-direction="none">
+                                            <span>Type</span>
+                                            <span class="material-icons">unfold_more</span>
+                                        </button>
+                                    </th>
+
+                                    <th>
+                                        <button class="table-sort-btn" type="button" data-sort="date-added" data-direction="none">
+                                            <span>Date Added</span>
+                                            <span class="material-icons">unfold_more</span>
+                                        </button>
+                                    </th>
+
+                                    <th>
+                                        <button class="table-sort-btn" type="button" data-sort="provider" data-direction="none">
+                                            <span>Provider</span>
+                                            <span class="material-icons">unfold_more</span>
+                                        </button>
+                                    </th>
+
+                                    <th class="actions-column"></th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="records-table-body"></tbody>
+
+                        </table>
 
                     </div>
 
                 </div>
 
-                <div class="main-content">
-                    <h1 class="home-title">Work in progress</h1>
+            </div>
 
-                    <p class="home-text">
-                        Still need to add the shopping list, add to cart, and purchase workflow.
-                    </p>
+
+
+
+
+            <div class="modal-overlay hidden" id="upload-modal">
+
+                <div class="upload-modal">
+
+                    <div class="upload-modal-header">
+                        <h2>Upload Document</h2>
+
+                        <button class="modal-close-btn" type="button" id="upload-modal-close">
+                            <span class="material-icons">close</span>
+                        </button>
+                    </div>
+
+                    <div class="alert error hidden upload-error" id="upload-error">
+                        <span class="material-icons">error_outline</span>
+                        <span class="msg-error-text">You can only upload 1 document at a time.</span>
+                    </div>
+
+                    <label class="upload-dropzone" id="upload-dropzone">
+                        <input type="file" id="upload-file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.dcm,.dicom" />
+
+                        <span class="material-icons">upload</span>
+
+                        <div class="upload-dropzone-description">
+                            <span class="upload-dropzone-title">
+                                Drop file here <span>or click to browse</span>
+                            </span>
+
+                            <span class="upload-dropzone-note">
+                                PDF, DOC, DOCX, JPG, PNG, DICOM - up to 50MB
+                            </span>
+                        </div>
+
+                    </label>
+
+                    <div class="upload-file-card hidden" id="upload-file-card">
+
+                        <div class="upload-file-icon">
+                            <span class="material-icons">description</span>
+                        </div>
+
+                        <div class="upload-file-info">
+                            <p class="upload-file-name" id="upload-file-name"></p>
+
+                            <p class="upload-file-meta">
+                                <span id="upload-file-size"></span>
+                                <span>•</span>
+                                Completed
+                            </p>
+                        </div>
+
+                        <button class="upload-file-remove" type="button" id="upload-file-remove">
+                            <span class="material-icons">delete</span>
+                        </button>
+
+                    </div>
+
+                    <form class="upload-document-form hidden" id="upload-document-form">
+
+                        <label class="form-label">
+                            Document Name
+                            <input type="text" name="documentName" required />
+                        </label>
+
+                        <label class="form-label">
+                            Document Type
+                            <div class="dropdown-field">
+                                <select name="documentType" required>
+                                    <option value="">Select document type</option>
+                                    <option value="Lab Report">Lab Report</option>
+                                    <option value="Prescription">Prescription</option>
+                                    <option value="Imaging">Imaging</option>
+                                    <option value="Visit Summary">Visit Summary</option>
+                                    <option value="Other">Other</option>
+                                </select>
+
+                                <div class="dropdown-icon">
+                                    <span class="material-icons">arrow_drop_down</span>
+                                </div>
+                            </div>
+                        </label>
+
+                        <label class="form-label">
+                            Provider
+                            <input type="text" name="provider" required />
+                        </label>
+
+                        <label class="form-label">
+                            Date of Document
+                            <input type="date" name="documentDate" required />
+                        </label>
+
+                        <div class="upload-modal-footer">
+                            <button type="submit" class="form-btn upload-submit-btn">Upload</button>
+                        </div>
+
+                    </form>
+
                 </div>
 
             </div>
-
 
         </div>
 

@@ -37,13 +37,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false
     },
-    major: {
+    accountType: {
       type: DataTypes.STRING,
       allowNull: false
     },
-    minor: {
-      type: DataTypes.STRING,
-      allowNull: true
+    emailVerified: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
     },
 
   }, {

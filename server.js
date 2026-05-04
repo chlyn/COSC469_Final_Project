@@ -1,27 +1,36 @@
 // -------------------------------------------------------------------------------------------------------------------------------
 // SERVER SETUP //
 
+// Loading environment variables from the .env file
+require("dotenv").config();  
+
 // Importing required packages
 const express = require("express");                                       // Express builds the web server (allows you to create routes, handle requests/responses, server webpages)
 const bcrypt = require("bcrypt");                                         // Bcrypt securely hash passwords
 const nodemailer = require("nodemailer");                                 // Nodemailer allows you to send emails from your server
 const open = (...args) => import("open").then((m) => m.default(...args)); // Open automatically opens the browser when the server starts
 const path = require("path");                                             // Node's path module builds file paths accross the os
-
-// Loading environment variables from the .env file
-require("dotenv").config();                                            
+const multer = require("multer");                                         // Multer handles file uploads
+const fs = require("fs");                                                 // File system helper
 
 // Variables
 const app = express();                                                    // Creates the express server instance
 const PORT = process.env.PORT || 3000;                                    // The port the server runs on
+const uploadsDir = path.join(__dirname, "uploads");                       // Directory to store uploaded files
+
+// Create uploads directory if it does not exist
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
 
 // Configuring middleware
 app.use(express.urlencoded({ extended: true }));                          // Allows express to read HTML form data (EX: req.body.username)
 app.use(express.static(path.join(__dirname, "public")));                  // Allows express to serve frontend files (html, css, js)
 app.use(express.json());                                                  // Allows express to read JSON request bodies (EX: fetching /api/login)
+app.use("/uploads", express.static(uploadsDir));                          // Allows express to serve uploaded files
 
 // Sequelize database connection and models
-const { sequelize, User, PasswordResetCode } = require("./models");       // Importing the Sequelize instance from the models folder (already configured using config.js and .env)
+const { sequelize, User, PasswordResetCode, Document } = require("./models"); // Importing the Sequelize instance from the models folder (already configured using config.js and .env)
 
 // Testing the connection to the MySQL database
 sequelize.authenticate()
@@ -37,6 +46,98 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Sending SoftCare verification emails
+async function sendVerificationEmail({ to, firstname, code, subject, heading, intro, securityNote }) {
+  await transporter.sendMail({
+    from: `"SoftCare" <${process.env.MAIL_USER}>`,
+    to,
+    subject,
+    text: `Hi ${firstname}, ${intro} Your verification code is: ${code}. This code expires in 10 minutes. ${securityNote} Best regards, SoftCare.`,
+    html: `
+      <div style="margin:0; padding:32px 16px; background:#F5F5FF; font-family:'Poppins','Open Sans',Arial,sans-serif;">
+        <div style="max-width:520px; width:100%; margin:0 auto; background:#ffffff; border:1px solid #DDDDF4; border-radius:16px; overflow:hidden; box-shadow:0 4px 8px rgba(80,80,193,0.12),0 2px 4px rgba(0,0,0,0.08);">
+          
+          <div style="background:#5050C1; color:#F5F5FF; padding:18px 24px; font-size:20px; font-weight:700; letter-spacing:0;">
+            SoftCare
+          </div>
+
+          <div style="padding:28px 24px 24px; color:#6B6A80; font-size:15px; line-height:1.6;">
+            <h1 style="margin:0 0 12px; color:#19182A; font-size:22px; line-height:1.3; font-weight:700;">
+              ${heading}
+            </h1>
+
+            <p style="margin:0 0 14px;">Hi ${firstname},</p>
+            <p style="margin:0 0 18px;">${intro}</p>
+            <p style="margin:0 0 10px; color:#19182A; font-weight:600;">Your verification code is:</p>
+
+            <p style="margin:0 0 20px; padding:18px 20px; border:1px solid #DDDDF4; border-radius:12px; background:#F5F5FF; color:#5050C1; text-align:center; font-size:30px; line-height:1; font-weight:700; letter-spacing:6px;">
+              ${code}
+            </p>
+
+            <p style="margin:0 0 14px; color:#9A99B2; font-size:14px;">
+              This code expires in 10 minutes.
+            </p>
+
+            <p style="margin:0 0 20px;">${securityNote}</p>
+
+            <p style="margin:0; color:#19182A;">
+              Best regards,<br>
+              SoftCare
+            </p>
+          </div>
+
+        </div>
+      </div>
+    `,
+  });
+}
+
+// Allowed upload file types
+const allowedUploadTypes = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+const allowedUploadExtensions = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".dcm", ".dicom"];
+
+function isAllowedUploadFile(file) {
+  const extension = path.extname(file.originalname).toLowerCase();
+
+  return allowedUploadTypes.includes(file.mimetype) || allowedUploadExtensions.includes(extension);
+}
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+
+  filename: (req, file, cb) => {
+    const safeOriginalName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    const uniqueName = `${Date.now()}-${safeOriginalName}`;
+
+    cb(null, uniqueName);
+  },
+});
+
+// Setting file size limit to 50MB
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!isAllowedUploadFile(file)) {
+      return cb(new Error("Document must be a PDF, JPG, PNG, or DICOM file."));
+    }
+
+    cb(null, true);
+  },
+});
+
 
 
 // -------------------------------------------------------------------------------------------------------------------------------
@@ -47,10 +148,10 @@ app.post("/api/create-account", async (req, res) => {
   try {
     
     // Pulling the submitted form data from the request body
-    const { firstname, lastname, email, password, major, minor } = req.body;
+    const { firstname, lastname, email, password, accountType } = req.body;
 
     // Checking if all required fields are present, else send missing error
-    if (!firstname || !lastname || !email || !password || !major) {
+    if (!firstname || !lastname || !email || !password || !accountType) {
       return res.status(400).json({ ok: false, message: "Missing required fields" });
     }
 
@@ -74,19 +175,44 @@ app.post("/api/create-account", async (req, res) => {
       lastname,
       email,
       password_hash,
-      major,
-      minor: minor || null,
+      accountType,
+      emailVerified: false,
+    });
+
+    // Creating a 6-digit verification code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hashing the code
+    const code_hash = await bcrypt.hash(code, 10);
+
+    // Setting the code expiration time to 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Deleting old codes from the database
+    await PasswordResetCode.destroy({
+      where: { email },
+    });
+
+    // Saving the new code into the database
+    await PasswordResetCode.create({
+      email,
+      code_hash,
+      expires_at: expiresAt,
+    });
+
+    // Sending account verification email
+    await sendVerificationEmail({
+      to: email,
+      firstname: user.firstname,
+      code,
+      subject: "Verify your SoftCare account",
+      heading: "Verify your account",
+      intro: "Welcome to SoftCare. Please verify your email address to finish creating your account.",
+      securityNote: "If you did not create a SoftCare account, you can safely ignore this email.",
     });
 
     // Sending a success response
-    return res.json({
-      ok: true,
-      user: {
-        firstname: user.firstname,
-        lastname: user.lastname,
-        email: user.email,
-      },
-    });
+    return res.json({ ok: true });
 
   } catch (err) {
 
@@ -118,12 +244,20 @@ app.post("/api/login", async (req, res) => {
     // Querying the database to check if user exists
     const user = await User.findOne({
       where: { email },
-      attributes: ["id", "firstname", "lastname", "email", "password_hash"],
+      attributes: ["id", "firstname", "lastname", "email", "password_hash", "emailVerified"],
     });
 
     // If user does not exist, then send invalid login error
     if (!user) {
       return res.status(401).json({ ok: false, message: "Invalid email or password" });
+    }
+
+    // If account email has not been verified, then block login
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        ok: false,
+        message: "Please verify your email before logging in.",
+      });
     }
 
     // Comparing if password matches stored hashed password
@@ -138,6 +272,7 @@ app.post("/api/login", async (req, res) => {
     return res.json({
       ok: true,
       user: {
+        id: user.id,
         firstname: user.firstname,
         lastname: user.lastname,
         email: user.email,
@@ -210,37 +345,14 @@ app.post("/api/forgot-password", async (req, res) => {
       });
 
       // Sending the email with verification code to the user
-      await transporter.sendMail({
-        from: `"Account Form Team" <${process.env.MAIL_USER}>`,
+      await sendVerificationEmail({
         to: email,
-        subject: "Your password verification code",
-        text: `Hi ${user.firstname}, we received a request to reset the password for the account associated with this email address. Your verification code is: ${code}. This code expires in 10 minutes. If you did not request a password reset, you can safely ignore this email. Best regards, the Account Form Team.`,
-        html: `
-          <div style="font-family:'Open Sans',Arial,sans-serif;">
-            <div style="max-width:520px; width:100%; background:#ffffff; border:1px solid #e6dbf9; border-radius:12px; overflow:hidden;">
-              
-              <div style="background:#874fce; color:#ffffff; text-align:center; padding:16px; font-size:20px; font-weight:700;">
-                Password Reset Verification Code
-              </div>
-
-              <div style="padding:24px; color:#6b7280; font-size:16px; line-height:1.6;">
-                <p>Hi ${user.firstname},</p>
-                <p>We received a request to reset the password for the account associated with this email address.</p>
-                <p>Your verification code is:</p>
-
-                <p style="font-weight:700; text-align:center; font-size:28px; letter-spacing:4px; color:#1f1d2b; margin:24px 0;">
-                  ${code}
-                </p>
-
-                <p><i>This code expires in 10 minutes.</i></p>
-                <p>If you did not request a password reset, you can safely ignore this email.</p>
-                <p>Best regards,<br>
-                Account Form Team</p>
-              </div>
-
-            </div>
-          </div>
-        `,
+        firstname: user.firstname,
+        code,
+        subject: "Your SoftCare password reset code",
+        heading: "Password reset code",
+        intro: "We received a request to reset the password for your SoftCare account.",
+        securityNote: "If you did not request a password reset, you can safely ignore this email.",
       });
 
     }
@@ -267,8 +379,8 @@ app.post("/api/verification", async (req, res) => {
 
   try {
 
-    // Pulling the submitted code and email from the request body
-    const { code, email } = req.body;
+    // Pulling the submitted code, email, and verification purpose from the request body
+    const { code, email, purpose } = req.body;
 
     // Checking if all required fields are present, else send missing error
     if (!code || !email) {
@@ -305,6 +417,34 @@ app.post("/api/verification", async (req, res) => {
     // If code does not match, then send invalid code error
     if (!isMatch) {
       return res.status(401).json({ ok: false, message: "Invalid code. Try again." });
+    }
+
+    // If verifying account creation, mark user as verified and return user data
+    if (purpose === "create-account") {
+      const user = await User.findOne({
+        where: { email },
+        attributes: ["id", "firstname", "lastname", "email", "emailVerified"],
+      });
+
+      if (!user) {
+        return res.status(400).json({ ok: false, message: "System error, please try again" });
+      }
+
+      await user.update({ emailVerified: true });
+
+      await PasswordResetCode.destroy({
+        where: { email },
+      });
+
+      return res.json({
+        ok: true,
+        user: {
+          id: user.id,
+          firstname: user.firstname,
+          lastname: user.lastname,
+          email: user.email,
+        },
+      });
     }
 
     // If code is correct, then proceed to password reset process
@@ -391,6 +531,143 @@ app.post("/api/new-password", async (req, res) => {
     return res.status(500).json({ ok: false, message: "System error, please try again" });
 
   }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// GET DOCUMENTS //
+
+app.get("/api/documents", async (req, res) => {
+
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const documents = await Document.findAll({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.json({ ok: true, documents });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load documents" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// FILE UPLOAD //
+
+app.post("/api/upload", upload.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+    const { userId, documentName, documentType, provider, documentDate } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ ok: false, message: "No file uploaded" });
+    }
+
+    if (!userId || !documentName || !documentType || !provider || !documentDate) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error("Could not remove incomplete upload:", err);
+      });
+
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const document = await Document.create({
+      userId,
+      documentName,
+      documentType,
+      provider,
+      documentDate,
+      originalName: file.originalname,
+      fileName: file.filename,
+      filePath: `/uploads/${file.filename}`,
+      size: file.size,
+      mimeType: file.mimetype,
+    });
+
+    return res.json({
+      ok: true,
+      document,
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Upload failed" });
+  }
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// DELETE DOCUMENT //
+
+app.delete("/api/documents/:id", async (req, res) => {
+
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const document = await Document.findOne({
+      where: {
+        id: req.params.id,
+        userId,
+      },
+    });
+
+    if (!document) {
+      return res.status(404).json({ ok: false, message: "Document not found" });
+    }
+
+    const storedFilePath = path.join(__dirname, document.filePath.replace(/^\/+/, ""));
+
+    await document.destroy();
+
+    fs.unlink(storedFilePath, (err) => {
+      if (err && err.code !== "ENOENT") {
+        console.error("Could not remove uploaded file:", err);
+      }
+    });
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not delete document" });
+
+  }
+
+});
+
+// Returning upload errors as JSON responses
+app.use((err, req, res, next) => {
+
+  if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({ ok: false, message: "Document must be 50MB or smaller." });
+  }
+
+  if (err) {
+    return res.status(400).json({ ok: false, message: err.message || "Upload failed" });
+  }
+
+  next();
 
 });
 
