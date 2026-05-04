@@ -1,0 +1,88 @@
+stages:
+  - checks
+  - build
+  - deploy
+
+variables:
+  NODE_ENV: test
+  DB_HOST: mysql
+  DB_USER: root
+  DB_PASSWORD: root
+  DB_TEST_NAME: cosc469_final_project_test
+  MAIL_USER: test@example.com
+  MAIL_PASS: fake-password
+  MYSQL_ROOT_PASSWORD: root
+  MYSQL_DATABASE: cosc469_final_project_test
+
+checks:
+  stage: checks
+  image: node:20
+  services:
+    - name: mysql:8
+      alias: mysql
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+  script:
+    - node --check server.js
+    - node --check public/script.js
+    - node --check models/index.js
+    - node --check models/user.js
+    - node --check models/document.js
+    - node --check models/passwordresetcode.js
+    - node --check migrations/20260406213254-create-user.js
+    - node --check migrations/20260406213307-create-password-reset-code.js
+    - node --check migrations/20260502202727-rename-major-to-account-type-and-drop-minor.js
+    - node --check migrations/20260503000000-create-document.js
+    - node --check migrations/20260503000001-add-email-verified-to-user.js
+    - node --check migrations/20260503000002-add-user-id-to-document.js
+    - npm run lint
+    - npm test
+
+build-artifact:
+  stage: build
+  image: node:20
+  needs:
+    - checks
+  script:
+    - mkdir -p artifact
+    - cp -r server.js package.json package-lock.json config models migrations public artifact/
+  artifacts:
+    name: softcare-app
+    paths:
+      - artifact/
+    expire_in: 7 days
+
+deploy-staging:
+  stage: deploy
+  image: node:20
+  needs:
+    - build-artifact
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+  environment:
+    name: staging
+  script:
+    - echo "Checks passed."
+    - echo "Deployment artifact is ready."
+    - echo "This is where staging deployment would happen."
+
+deploy-production:
+  stage: deploy
+  image: node:20
+  needs:
+    - build-artifact
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  environment:
+    name: production
+  script:
+    - echo "Checks passed."
+    - echo "Manual production approval was granted in GitLab."
+    - echo "This is where production deployment would happen."
