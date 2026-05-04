@@ -30,7 +30,6 @@ const STORAGE_KEYS = {
 
 // Storing main HTML page containers
 const authContainer = document.querySelector(".background-auth"); // Authentication page background and forms
-const formContainer = document.querySelector(".form-container");  // Holds all forms (login, create, forgot-password, verification, reset-password)
 const homeContainer = document.querySelector("#home");            // Main homepage 
 
 // Storing profile dropdown menu elements
@@ -297,8 +296,7 @@ function populateHome(user) {
   const firstname = user.firstname || "";
   const lastname = user.lastname || "";
 
-  // Creating full name and name initials from user informatiom
-  const fullName = `${firstname} ${lastname}`.trim();
+  // Creating name initials from user informatiom
   const initials = `${firstname.charAt(0)}${lastname.charAt(0)}`.toUpperCase();
 
   // Getting HTML Elements that will be updated

@@ -716,16 +716,20 @@ app.get("/new-password", (req, res) => {
 // -------------------------------------------------------------------------------------------------------------------------------
 // START SERVER //
 
-app.listen(PORT, async () => {
+if (require.main === module) {
+  app.listen(PORT, async () => {
 
-  const url = `http://localhost:${PORT}`;     // Creating server URL
-  console.log(`Server running on ${url}`);    // Confirming when the server starts in to terminal
-  
-  // Preventing the server to open browser multiple times
-  // Opening browser only when environment variables does not exist
-  if (!process.env.__BROWSER_OPENED) {
-    process.env.__BROWSER_OPENED = "true";
-    await open(url);
-  }
+    const url = `http://localhost:${PORT}`;     // Creating server URL
+    console.log(`Server running on ${url}`);    // Confirming when the server starts in to terminal
+    
+    // Preventing the server to open browser multiple times
+    // Opening browser only when environment variables does not exist
+    if (!process.env.__BROWSER_OPENED) {
+      process.env.__BROWSER_OPENED = "true";
+      await open(url);
+    }
 
-});
+  });
+}
+
+module.exports = app;
