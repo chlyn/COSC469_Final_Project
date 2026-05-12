@@ -32,10 +32,7 @@ const STORAGE_KEYS = {
 const authContainer = document.querySelector(".background-auth"); // Authentication page background and forms
 const homeContainer = document.querySelector("#home");            // Main homepage 
 
-// Storing profile dropdown menu elements
-const profileBtn = document.getElementById("profile-btn");
-const profileMenu = document.getElementById("profile-menu");
-const userProfile = document.querySelector(".user-profile");
+// Storing sidebar action elements
 const signoutBtn = document.getElementById("signout-btn");
 
 // Storing form references 
@@ -294,20 +291,11 @@ function populateHome(user) {
 
   // Pulling user information
   const firstname = user.firstname || "";
-  const lastname = user.lastname || "";
-
-  // Creating name initials from user informatiom
-  const initials = `${firstname.charAt(0)}${lastname.charAt(0)}`.toUpperCase();
-
   // Getting HTML Elements that will be updated
   const topbarTitle = document.getElementById("topbar-title");
-  const profileName = document.querySelector(".profile-name");
-  const profileImg = document.querySelector(".profile-img");
 
   // Updating UI with user's information
   if (topbarTitle) topbarTitle.textContent = `Welcome back, ${firstname}`;
-  if (profileName) profileName.textContent = firstname;
-  if (profileImg) profileImg.textContent = initials;
 
 }
 
@@ -323,8 +311,8 @@ function showHome(message = "") {
   // Inserting users's information from localStorage
   populateHome(getCurrentUser());
 
-  // Loading uploaded documents from the database
-  loadDocuments();
+  // Showing the correct dashboard based on account type
+  setupDashboardForCurrentUser();
 
   // If success alert message is empty, then show success alert
   if (!message) return;
@@ -408,29 +396,7 @@ function setupRouteSwitching() {
 
 // Controlling profile menu interaction according to user's actions
 function setupProfileMenu() {
-
-  // Listening for any clicks on the profile button
-  profileBtn?.addEventListener("click", (e) => {
-
-    // Preventing menu from closing immediately after click
-    e.stopPropagation();
-
-    // Displaying profile menu by adding the "open" class
-    profileMenu?.classList.toggle("open");
-
-  });
-
-  // Listening for any clicks anywhere on the page
-  document.addEventListener("click", (e) => {
-
-    // If click was inside the profile area, then do nothing
-    if (!userProfile || userProfile.contains(e.target)) return;
-
-    // If click was outside the profile area, then hide profile menu by removing the "open" class
-    profileMenu?.classList.remove("open");
-
-  })
-  ;
+  // Profile is now a normal sidebar page.
 }
 
 
@@ -449,9 +415,6 @@ function setupSignout() {
 
     // Removing temporary reset email and verification status from localStorage
     clearResetState();
-
-    // Hiding profile menu by removing "open" class
-    profileMenu?.classList.remove("open");
 
     // Changing URL to login without reloading the page
     navigate(ROUTES.login);
@@ -830,7 +793,49 @@ async function handleNewPasswordSubmit(e) {
 /* DOCUMENTS TABLE */
 
 const recordsTableBody = document.getElementById("records-table-body");
+const recordsTableHeadRow = document.querySelector(".records-table thead tr");
+const pageTitle = document.getElementById("page-title");
+const uploadDocBtnText = document.getElementById("upload-doc-btn-text");
+const patientBackBtn = document.getElementById("patient-back-btn");
+const patientDetails = document.getElementById("patient-details");
+const careTeamNavBtn = document.getElementById("care-team-nav-btn");
+const notificationsNavBtn = document.getElementById("notifications-nav-btn");
+const notificationsCount = document.getElementById("notifications-count");
+const notificationsList = document.getElementById("notifications-list");
+const recordsTableList = document.querySelector(".records-table-list");
+const recordsControls = document.querySelector(".records-controls");
+const recordsMainContent = recordsControls?.closest(".main-content");
+const profileForm = document.getElementById("profile-form");
+const profilePasswordBtn = document.getElementById("profile-password-btn");
+const profilePasswordModal = document.getElementById("profile-password-modal");
+const profilePasswordClose = document.getElementById("profile-password-close");
+const profilePasswordError = document.getElementById("profile-password-error");
+const profilePasswordSuccess = document.getElementById("profile-password-success");
+const profilePasswordCodeForm = document.getElementById("profile-password-code-form");
+const profilePasswordVerifyForm = document.getElementById("profile-password-verify-form");
+const profilePasswordChangeForm = document.getElementById("profile-password-change-form");
+const patientProfileSection = document.getElementById("patient-profile-section");
+const doctorProfileSection = document.getElementById("doctor-profile-section");
+const profileSaveBtn = document.getElementById("profile-save-btn");
+const relationshipModal = document.getElementById("relationship-modal");
+const relationshipModalTitle = document.getElementById("relationship-modal-title");
+const relationshipModalClose = document.getElementById("relationship-modal-close");
+const relationshipError = document.getElementById("relationship-error");
+const relationshipSearchInput = document.getElementById("relationship-search-input");
+const relationshipSearchClearBtn = document.getElementById("relationship-search-clear-btn");
+const relationshipList = document.getElementById("relationship-list");
+
 let recordsDocuments = [];
+let patients = [];
+let doctors = [];
+let documentRequests = [];
+let careTeamRequests = [];
+let relationshipCandidates = [];
+let selectedPatient = null;
+let appView = "records";
+let verifiedProfilePasswordCode = "";
+let initialProfileSnapshot = "";
+
 let activeRecordsSort = {
   key: "",
   direction: "none",
@@ -858,9 +863,140 @@ function getDocumentTypeBadgeClass(documentType) {
   return "other";
 }
 
+function isProvider(user = getCurrentUser()) {
+  return user?.accountType === "Healthcare Provider";
+}
+
+function isPatient(user = getCurrentUser()) {
+  return user?.accountType === "Patient";
+}
+
+function setPageTitle(title) {
+  if (pageTitle) pageTitle.textContent = title;
+}
+
+function setControlsVisibility({ search = true, type = true, date = true, clear = true } = {}) {
+  recordSearchInput?.closest(".record-search")?.classList.toggle("hidden", !search);
+  typeFilterBtn?.closest(".record-filter")?.classList.toggle("hidden", !type);
+  dateRangeBtn?.closest(".date-range-filter")?.classList.toggle("hidden", !date);
+  recordsClearBtn?.classList.toggle("hidden", !clear || !hasActiveFilters());
+}
+
+function renderTableHeaders(headers) {
+  if (!recordsTableHeadRow) return;
+
+  recordsTableHeadRow.innerHTML = headers.map((header) => {
+    if (!header.sort) {
+      return `<th class="${header.className || ""}">${escapeHTML(header.label || "")}</th>`;
+    }
+
+    return `
+      <th>
+        <button class="table-sort-btn" type="button" data-sort="${escapeHTML(header.sort)}" data-direction="none">
+          <span>${escapeHTML(header.label)}</span>
+          <span class="material-icons">unfold_more</span>
+        </button>
+      </th>
+    `;
+  }).join("");
+
+  setupTableSortButtons();
+}
+
+function showTable() {
+  recordsMainContent?.classList.remove("hidden");
+  recordsTableList?.classList.remove("hidden");
+  notificationsList?.classList.add("hidden");
+  profileForm?.classList.add("hidden");
+}
+
+function showNotificationsPanel() {
+  recordsMainContent?.classList.remove("hidden");
+  recordsTableList?.classList.add("hidden");
+  notificationsList?.classList.remove("hidden");
+  profileForm?.classList.add("hidden");
+}
+
+function showProfilePanel() {
+  recordsMainContent?.classList.remove("hidden");
+  recordsTableList?.classList.add("hidden");
+  notificationsList?.classList.add("hidden");
+  profileForm?.classList.remove("hidden");
+}
+
+function showDetailsOnlyPanel() {
+  recordsMainContent?.classList.add("hidden");
+  recordsTableList?.classList.add("hidden");
+  notificationsList?.classList.add("hidden");
+  profileForm?.classList.add("hidden");
+}
+
+function showPatientDetails(patient) {
+  if (!patientDetails || !patient) return;
+  const medicalInfo = patient.medicalInfo || {};
+  const details = [
+    ["Date of Birth", medicalInfo.dateOfBirth],
+    ["Blood Type", medicalInfo.bloodType],
+    ["Allergies", medicalInfo.allergies],
+    ["Medical Conditions", medicalInfo.conditions],
+    ["Medications", medicalInfo.medications],
+    ["Emergency Contact", medicalInfo.emergencyContact],
+  ].filter(([, value]) => Boolean(String(value || "").trim()));
+
+  patientDetails.innerHTML = `
+    <div class="patient-detail-heading">
+      <h2>${escapeHTML(patient.firstname)} ${escapeHTML(patient.lastname)}</h2>
+      <p>${escapeHTML(patient.email)}</p>
+    </div>
+
+    ${details.map(([label, value]) => `
+      <div class="patient-detail-item">
+        <p class="patient-detail-label">${escapeHTML(label)}</p>
+        <p class="patient-detail-value">${escapeHTML(value)}</p>
+      </div>
+    `).join("")}
+  `;
+
+  patientDetails.classList.remove("hidden");
+}
+
+function showDoctorDetails(doctor) {
+  if (!patientDetails || !doctor) return;
+  const info = doctor.medicalInfo || {};
+  const details = [
+    ["Doctor Type", info.specialty],
+    ["Phone", info.phone],
+    ["Workplace", info.workplace],
+    ["Address", info.address],
+  ].filter(([, value]) => Boolean(String(value || "").trim()));
+
+  patientDetails.innerHTML = `
+    <div class="patient-detail-heading">
+      <h2>${escapeHTML(doctor.firstname)} ${escapeHTML(doctor.lastname)}</h2>
+      <p>${escapeHTML(info.contactEmail || doctor.email)}</p>
+    </div>
+
+    ${details.map(([label, value]) => `
+      <div class="patient-detail-item">
+        <p class="patient-detail-label">${escapeHTML(label)}</p>
+        <p class="patient-detail-value">${escapeHTML(value)}</p>
+      </div>
+    `).join("")}
+  `;
+
+  patientDetails.classList.remove("hidden");
+}
+
+function hidePatientDetails() {
+  patientDetails?.classList.add("hidden");
+  if (patientDetails) patientDetails.innerHTML = "";
+}
+
 function createDocumentRow(document) {
   const badgeClass = getDocumentTypeBadgeClass(document.documentType);
   const filePath = escapeHTML(document.filePath);
+  const currentUser = getCurrentUser();
+  const canDelete = isPatient(currentUser) && appView === "records";
 
   return `
     <tr>
@@ -892,7 +1028,7 @@ function createDocumentRow(document) {
               <span>Download</span>
             </button>
 
-            <button type="button" class="table-menu-option danger" data-action="delete" data-id="${escapeHTML(document.id)}">
+            <button type="button" class="table-menu-option danger ${canDelete ? "" : "hidden"}" data-action="delete" data-id="${escapeHTML(document.id)}">
               <span class="material-icons">delete</span>
               <span>Delete</span>
             </button>
@@ -903,10 +1039,69 @@ function createDocumentRow(document) {
   `;
 }
 
+function createPatientRow(patient) {
+  const isClickable = appView === "patients";
+
+  return `
+    <tr>
+      <td>
+        <button class="patient-link" type="button" data-patient-id="${escapeHTML(patient.id)}" ${isClickable ? "" : "disabled"}>
+          ${escapeHTML(patient.firstname)} ${escapeHTML(patient.lastname)}
+        </button>
+      </td>
+      <td>${escapeHTML(patient.email)}</td>
+      <td class="actions-column">
+        <button class="icon-action-btn" type="button" data-relationship-delete-id="${escapeHTML(patient.relationshipId)}" aria-label="Remove patient">
+          <span class="material-icons">delete</span>
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
+function createDoctorRow(doctor) {
+  const info = doctor.medicalInfo || {};
+
+  return `
+    <tr>
+      <td>
+        <button class="patient-link" type="button" data-doctor-id="${escapeHTML(doctor.id)}">
+          ${escapeHTML(doctor.firstname)} ${escapeHTML(doctor.lastname)}
+        </button>
+      </td>
+      <td>${escapeHTML(info.specialty || "Not provided")}</td>
+      <td>${escapeHTML(info.workplace || "Not provided")}</td>
+      <td class="actions-column">
+        <button class="icon-action-btn" type="button" data-relationship-delete-id="${escapeHTML(doctor.relationshipId)}" aria-label="Remove doctor">
+          <span class="material-icons">delete</span>
+        </button>
+      </td>
+    </tr>
+  `;
+}
+
 function renderDocuments(documents) {
   if (!recordsTableBody) return;
 
-  recordsTableBody.innerHTML = documents.map(createDocumentRow).join("");
+  recordsTableBody.innerHTML = documents.length
+    ? documents.map(createDocumentRow).join("")
+    : `<tr><td colspan="5" class="empty-state">No documents found.</td></tr>`;
+}
+
+function renderPatients(list) {
+  if (!recordsTableBody) return;
+
+  recordsTableBody.innerHTML = list.length
+    ? list.map(createPatientRow).join("")
+    : `<tr><td colspan="3" class="empty-state">No patients found.</td></tr>`;
+}
+
+function renderDoctors(list) {
+  if (!recordsTableBody) return;
+
+  recordsTableBody.innerHTML = list.length
+    ? list.map(createDoctorRow).join("")
+    : `<tr><td colspan="4" class="empty-state">No doctors found.</td></tr>`;
 }
 
 function getFilteredDocuments() {
@@ -931,6 +1126,36 @@ function getFilteredDocuments() {
       (documentDate >= activeRecordsDateRange.from && documentDate <= activeRecordsDateRange.to);
 
     return matchesSearch && matchesType && matchesDate;
+  });
+}
+
+function getFilteredPatients() {
+  const searchValue = recordSearchInput?.value.trim().toLowerCase() || "";
+
+  return patients.filter((patient) => {
+    const fullName = `${patient.firstname ?? ""} ${patient.lastname ?? ""}`.toLowerCase();
+
+    return (
+      !searchValue ||
+      fullName.includes(searchValue) ||
+      String(patient.email ?? "").toLowerCase().includes(searchValue) ||
+      String(patient.id ?? "").includes(searchValue)
+    );
+  });
+}
+
+function getFilteredDoctors() {
+  const searchValue = recordSearchInput?.value.trim().toLowerCase() || "";
+
+  return doctors.filter((doctor) => {
+    const fullName = `${doctor.firstname ?? ""} ${doctor.lastname ?? ""}`.toLowerCase();
+
+    return (
+      !searchValue ||
+      fullName.includes(searchValue) ||
+      String(doctor.email ?? "").toLowerCase().includes(searchValue) ||
+      String(doctor.id ?? "").includes(searchValue)
+    );
   });
 }
 
@@ -963,6 +1188,29 @@ function renderSortedDocuments() {
   renderDocuments(getSortedDocuments());
 }
 
+function renderPatientList() {
+  renderPatients(getSortedPeople(getFilteredPatients()));
+}
+
+function renderDoctorList() {
+  renderDoctors(getSortedPeople(getFilteredDoctors()));
+}
+
+function getSortedPeople(list) {
+  if (activeRecordsSort.key !== "person-name" || activeRecordsSort.direction === "none") {
+    return list;
+  }
+
+  const directionMultiplier = activeRecordsSort.direction === "asc" ? 1 : -1;
+
+  return [...list].sort((a, b) => {
+    const aName = `${a.lastname ?? ""} ${a.firstname ?? ""}`.toLowerCase();
+    const bName = `${b.lastname ?? ""} ${b.firstname ?? ""}`.toLowerCase();
+
+    return aName.localeCompare(bName) * directionMultiplier;
+  });
+}
+
 async function loadDocuments() {
   if (!recordsTableBody) return;
 
@@ -975,7 +1223,8 @@ async function loadDocuments() {
   }
 
   try {
-    const res = await fetch(`/api/documents?userId=${encodeURIComponent(currentUser.id)}`);
+    const targetUserId = selectedPatient?.id || currentUser.id;
+    const res = await fetch(`/api/documents?userId=${encodeURIComponent(targetUserId)}`);
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok || !data.ok) {
@@ -989,6 +1238,457 @@ async function loadDocuments() {
   } catch (err) {
     console.error(err);
   }
+}
+
+async function loadPatients() {
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id) return;
+
+  try {
+    const res = await fetch(`/api/patients?providerId=${encodeURIComponent(currentUser.id)}`);
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not load patients");
+      return;
+    }
+
+    patients = data.patients || [];
+    renderPatientList();
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function loadDoctors() {
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id) return;
+
+  try {
+    const res = await fetch(`/api/doctors?patientId=${encodeURIComponent(currentUser.id)}`);
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not load doctors");
+      return;
+    }
+
+    doctors = data.doctors || [];
+    renderDoctorList();
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function loadDocumentRequests() {
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id || !isPatient(currentUser)) {
+    documentRequests = [];
+    renderNotifications();
+    updateNotificationsBadge();
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/document-requests?patientId=${encodeURIComponent(currentUser.id)}&status=pending`);
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not load document requests");
+      return;
+    }
+
+    documentRequests = data.requests || [];
+    renderNotifications();
+    updateNotificationsBadge();
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function updateNotificationsBadge() {
+  if (!notificationsCount) return;
+
+  const total = documentRequests.length + careTeamRequests.length;
+
+  notificationsCount.textContent = String(total);
+  notificationsCount.classList.toggle("hidden", total === 0);
+}
+
+async function loadCareTeamRequests() {
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id || (!isPatient(currentUser) && !isProvider(currentUser))) {
+    careTeamRequests = [];
+    renderNotifications();
+    updateNotificationsBadge();
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/care-team-requests?userId=${encodeURIComponent(currentUser.id)}`);
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not load care team requests");
+      return;
+    }
+
+    careTeamRequests = data.requests || [];
+    renderNotifications();
+    updateNotificationsBadge();
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function renderNotifications() {
+  if (!notificationsList) return;
+
+  const filteredDocumentRequests = getFilteredDocumentRequests();
+  const filteredCareTeamRequests = getFilteredCareTeamRequests();
+
+  const documentRequestCards = filteredDocumentRequests.map((request) => `
+      <div class="notification-card">
+        <div>
+          <p class="notification-title">${escapeHTML(request.documentName)}</p>
+          <p class="notification-meta">
+            ${escapeHTML(request.provider)} requested to add a ${escapeHTML(request.documentType)} dated ${escapeHTML(request.documentDate)}.
+            Requested ${escapeHTML(formatNotificationDate(request.createdAt))}.
+          </p>
+        </div>
+
+        <div class="notification-actions">
+          <button class="notification-action-btn" type="button" data-request-action="view" data-file-path="${escapeHTML(request.filePath)}">
+            <span class="material-icons">visibility</span>
+            View
+          </button>
+
+          <button class="notification-action-btn" type="button" data-request-action="reject" data-request-id="${escapeHTML(request.id)}">
+            Reject
+          </button>
+
+          <button class="notification-action-btn approve" type="button" data-request-action="approve" data-request-id="${escapeHTML(request.id)}">
+            Approve
+          </button>
+        </div>
+      </div>
+    `);
+
+  const careTeamRequestCards = filteredCareTeamRequests.map((request) => {
+    const requester = request.requester || {};
+    const requesterLabel = requester.accountType === "Patient" ? "patient" : "doctor";
+
+    return `
+      <div class="notification-card">
+        <div>
+          <p class="notification-title">New ${requesterLabel} request</p>
+          <p class="notification-meta">
+            ${escapeHTML(requester.firstname)} ${escapeHTML(requester.lastname)} wants to connect with you on SoftCare.
+            Requested ${escapeHTML(formatNotificationDate(request.createdAt))}.
+          </p>
+        </div>
+
+        <div class="notification-actions">
+          <button class="notification-action-btn" type="button" data-care-team-action="reject" data-request-id="${escapeHTML(request.id)}">
+            Reject
+          </button>
+
+          <button class="notification-action-btn approve" type="button" data-care-team-action="approve" data-request-id="${escapeHTML(request.id)}">
+            Approve
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  const cards = [...documentRequestCards, ...careTeamRequestCards];
+
+  notificationsList.innerHTML = cards.length
+    ? cards.join("")
+    : `<div class="empty-state">No pending notifications.</div>`;
+}
+
+function formatNotificationDate(value) {
+  if (!value) return "";
+
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function isWithinActiveNotificationDateRange(value) {
+  if (!activeRecordsDateRange || !value) return true;
+
+  const notificationDate = new Date(value);
+  notificationDate.setHours(0, 0, 0, 0);
+
+  return notificationDate >= activeRecordsDateRange.from && notificationDate <= activeRecordsDateRange.to;
+}
+
+function getFilteredDocumentRequests() {
+  const searchValue = recordSearchInput?.value.trim().toLowerCase() || "";
+
+  return documentRequests.filter((request) => {
+    const searchText = [
+      request.documentName,
+      request.documentType,
+      request.documentDate,
+      request.provider,
+      formatNotificationDate(request.createdAt),
+    ].join(" ").toLowerCase();
+
+    return (!searchValue || searchText.includes(searchValue)) && isWithinActiveNotificationDateRange(request.createdAt);
+  });
+}
+
+function getFilteredCareTeamRequests() {
+  const searchValue = recordSearchInput?.value.trim().toLowerCase() || "";
+
+  return careTeamRequests.filter((request) => {
+    const requester = request.requester || {};
+    const requesterLabel = requester.accountType === "Patient" ? "patient" : "doctor";
+    const searchText = [
+      `new ${requesterLabel} request`,
+      requester.firstname,
+      requester.lastname,
+      requester.email,
+      formatNotificationDate(request.createdAt),
+    ].join(" ").toLowerCase();
+
+    return (!searchValue || searchText.includes(searchValue)) && isWithinActiveNotificationDateRange(request.createdAt);
+  });
+}
+
+function fillProfileForm(user) {
+  if (!profileForm || !user) return;
+
+  const medicalInfo = user.medicalInfo || {};
+  const userIsProvider = user.accountType === "Healthcare Provider";
+
+  patientProfileSection?.classList.toggle("hidden", userIsProvider);
+  doctorProfileSection?.classList.toggle("hidden", !userIsProvider);
+
+  profileForm.firstname.value = user.firstname || "";
+  profileForm.lastname.value = user.lastname || "";
+  profileForm.email.value = user.email || "";
+  profileForm.dateOfBirth.value = medicalInfo.dateOfBirth || "";
+  profileForm.bloodType.value = medicalInfo.bloodType || "";
+  profileForm.allergies.value = medicalInfo.allergies || "";
+  profileForm.conditions.value = medicalInfo.conditions || "";
+  profileForm.medications.value = medicalInfo.medications || "";
+  profileForm.emergencyContact.value = medicalInfo.emergencyContact || "";
+  profileForm.specialty.value = medicalInfo.specialty || "";
+  profileForm.phone.value = medicalInfo.phone || "";
+  profileForm.contactEmail.value = medicalInfo.contactEmail || "";
+  profileForm.workplace.value = medicalInfo.workplace || "";
+  profileForm.address.value = medicalInfo.address || "";
+  initialProfileSnapshot = getProfileSnapshot();
+  updateProfileSaveButton();
+}
+
+function getProfileSnapshot() {
+  if (!profileForm) return "";
+
+  const formValues = getFormData(profileForm);
+
+  return JSON.stringify(formValues);
+}
+
+function updateProfileSaveButton() {
+  if (!profileSaveBtn) return;
+
+  profileSaveBtn.disabled = getProfileSnapshot() === initialProfileSnapshot;
+}
+
+async function loadProfile() {
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id) return;
+
+  try {
+    const res = await fetch(`/api/profile?userId=${encodeURIComponent(currentUser.id)}`);
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not load profile");
+      return;
+    }
+
+    fillProfileForm(data.user);
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function showProfileView() {
+  appView = "profile";
+  selectedPatient = null;
+
+  setPageTitle("My Profile");
+  hidePatientDetails();
+  showProfilePanel();
+  patientBackBtn?.classList.add("hidden");
+  uploadDocBtn?.classList.add("hidden");
+  recordsControls?.classList.add("hidden");
+  loadProfile();
+}
+
+function showPatientRecordsView() {
+  appView = "records";
+  selectedPatient = null;
+
+  setPageTitle("My Records");
+  hidePatientDetails();
+  showTable();
+  renderTableHeaders([
+    { label: "Document Name", sort: "document-name" },
+    { label: "Type", sort: "document-type" },
+    { label: "Date Added", sort: "date-added" },
+    { label: "Provider", sort: "provider" },
+    { label: "", className: "actions-column" },
+  ]);
+
+  patientBackBtn?.classList.add("hidden");
+  uploadDocBtn?.classList.remove("hidden");
+  if (uploadDocBtnText) uploadDocBtnText.textContent = "Upload Document";
+
+  recordsControls?.classList.remove("hidden");
+  setControlsVisibility({ search: true, type: true, date: true, clear: true });
+  loadDocuments();
+  loadDocumentRequests();
+  loadCareTeamRequests();
+}
+
+function showPatientNotificationsView() {
+  appView = "notifications";
+
+  setPageTitle("Notifications");
+  hidePatientDetails();
+  showNotificationsPanel();
+  patientBackBtn?.classList.add("hidden");
+  uploadDocBtn?.classList.add("hidden");
+  recordsControls?.classList.remove("hidden");
+  setControlsVisibility({ search: true, type: false, date: true, clear: true });
+  resetRecordsFilters();
+  loadDocumentRequests();
+  loadCareTeamRequests();
+}
+
+function showPatientDoctorsView() {
+  appView = "doctors";
+  selectedPatient = null;
+
+  setPageTitle("My Doctors");
+  hidePatientDetails();
+  showTable();
+  renderTableHeaders([
+    { label: "Doctor Name", sort: "person-name" },
+    { label: "Doctor Type" },
+    { label: "Workplace" },
+    { label: "", className: "actions-column" },
+  ]);
+
+  patientBackBtn?.classList.add("hidden");
+  uploadDocBtn?.classList.remove("hidden");
+  if (uploadDocBtnText) uploadDocBtnText.textContent = "Add Doctor";
+
+  recordsControls?.classList.remove("hidden");
+  setControlsVisibility({ search: true, type: false, date: false, clear: true });
+  resetRecordsFilters();
+  loadDoctors();
+}
+
+function showProviderPatientsView() {
+  appView = "patients";
+  selectedPatient = null;
+
+  setPageTitle("My Patients");
+  hidePatientDetails();
+  showTable();
+  renderTableHeaders([
+    { label: "Patient Name", sort: "person-name" },
+    { label: "Email" },
+    { label: "", className: "actions-column" },
+  ]);
+
+  patientBackBtn?.classList.add("hidden");
+  uploadDocBtn?.classList.remove("hidden");
+  if (uploadDocBtnText) uploadDocBtnText.textContent = "Add Patient";
+  recordsControls?.classList.remove("hidden");
+  setControlsVisibility({ search: true, type: false, date: false, clear: true });
+  resetRecordsFilters();
+  loadPatients();
+  loadCareTeamRequests();
+}
+
+async function showProviderPatientRecordsView(patient) {
+  appView = "patient-records";
+  selectedPatient = patient;
+
+  setPageTitle("Back");
+  showPatientDetails(patient);
+  showTable();
+  renderTableHeaders([
+    { label: "Document Name", sort: "document-name" },
+    { label: "Type", sort: "document-type" },
+    { label: "Date Added", sort: "date-added" },
+    { label: "Provider", sort: "provider" },
+    { label: "", className: "actions-column" },
+  ]);
+
+  patientBackBtn?.classList.remove("hidden");
+  uploadDocBtn?.classList.remove("hidden");
+  if (uploadDocBtnText) uploadDocBtnText.textContent = "Add Document";
+
+  recordsControls?.classList.remove("hidden");
+  setControlsVisibility({ search: true, type: true, date: true, clear: true });
+  resetRecordsFilters();
+  await loadDocuments();
+}
+
+function showPatientDoctorDetailsView(doctor) {
+  appView = "doctor-details";
+
+  setPageTitle("Back");
+  showDoctorDetails(doctor);
+  showDetailsOnlyPanel();
+
+  patientBackBtn?.classList.remove("hidden");
+  uploadDocBtn?.classList.add("hidden");
+  recordsControls?.classList.add("hidden");
+}
+
+function setupDashboardForCurrentUser() {
+  const currentUser = getCurrentUser();
+  const recordsNavText = document.querySelector('[data-target="my-records"] .nav-text');
+
+  document.querySelectorAll(".nav-btn").forEach((button) => {
+    button.classList.toggle("active", button.dataset.target === "my-records");
+  });
+
+  if (isProvider(currentUser)) {
+    if (recordsNavText) recordsNavText.textContent = "My Patients";
+    careTeamNavBtn?.classList.add("hidden");
+    notificationsNavBtn?.classList.remove("hidden");
+    showProviderPatientsView();
+    return;
+  }
+
+  if (recordsNavText) recordsNavText.textContent = "My Records";
+  careTeamNavBtn?.classList.toggle("hidden", !isPatient(currentUser));
+  notificationsNavBtn?.classList.toggle("hidden", !isPatient(currentUser));
+  showPatientRecordsView();
 }
 
 
@@ -1021,6 +1721,113 @@ const ALLOWED_UPLOAD_TYPES = [
 
 const ALLOWED_UPLOAD_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx", ".dcm", ".dicom"];
 const MAX_UPLOAD_SIZE = 50 * 1024 * 1024;
+
+function showRelationshipError(message) {
+  const errorText = relationshipError?.querySelector(".msg-error-text");
+
+  if (errorText) errorText.textContent = message;
+  relationshipError?.classList.remove("hidden");
+}
+
+function hideRelationshipError() {
+  const errorText = relationshipError?.querySelector(".msg-error-text");
+
+  if (errorText) errorText.textContent = "";
+  relationshipError?.classList.add("hidden");
+}
+
+function getFilteredRelationshipCandidates() {
+  const searchValue = relationshipSearchInput?.value.trim().toLowerCase() || "";
+
+  return relationshipCandidates.filter((user) => {
+    const fullName = `${user.firstname ?? ""} ${user.lastname ?? ""}`.toLowerCase();
+    const info = user.medicalInfo || {};
+    const profileText = `${info.specialty ?? ""} ${info.workplace ?? ""}`.toLowerCase();
+
+    return (
+      !searchValue ||
+      fullName.includes(searchValue) ||
+      String(user.email ?? "").toLowerCase().includes(searchValue) ||
+      profileText.includes(searchValue)
+    );
+  });
+}
+
+function renderRelationshipCandidates() {
+  if (!relationshipList) return;
+
+  const candidates = getFilteredRelationshipCandidates();
+
+  relationshipList.innerHTML = candidates.length
+    ? candidates.map((user) => {
+      const statusText = user.relationshipStatus === "approved"
+        ? isProvider() ? "Already your patient" : "Already your doctor"
+        : user.relationshipStatus === "pending"
+          ? "Pending approval"
+          : "";
+
+      return `
+      <div class="relationship-row">
+        <div>
+          <p class="relationship-name">${escapeHTML(user.firstname)} ${escapeHTML(user.lastname)}</p>
+          <p class="relationship-email">${escapeHTML(user.email)}</p>
+        </div>
+
+        ${statusText
+          ? `<span class="relationship-status">${escapeHTML(statusText)}</span>`
+          : `<button class="relationship-add-btn" type="button" data-add-user-id="${escapeHTML(user.id)}">
+              <span class="material-icons">person_add</span>
+              Add
+            </button>`
+        }
+      </div>
+    `;
+    }).join("")
+    : `<div class="empty-state">No matches found.</div>`;
+}
+
+async function openRelationshipModal() {
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id) return;
+
+  hideRelationshipError();
+  if (relationshipSearchInput) relationshipSearchInput.value = "";
+  relationshipSearchClearBtn?.classList.add("hidden");
+  relationshipCandidates = [];
+
+  if (relationshipModalTitle) {
+    relationshipModalTitle.textContent = isProvider(currentUser) ? "Add Patient" : "Add Doctor";
+  }
+
+  relationshipModal?.classList.remove("hidden");
+  renderRelationshipCandidates();
+
+  try {
+    const res = await fetch(`/api/care-team-candidates?requesterId=${encodeURIComponent(currentUser.id)}`);
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      showRelationshipError(data.message || "Could not load users.");
+      return;
+    }
+
+    relationshipCandidates = data.users || [];
+    renderRelationshipCandidates();
+
+  } catch (err) {
+    console.error(err);
+    showRelationshipError("System error, please try again.");
+  }
+}
+
+function closeRelationshipModal() {
+  relationshipModal?.classList.add("hidden");
+  relationshipCandidates = [];
+  if (relationshipSearchInput) relationshipSearchInput.value = "";
+  relationshipSearchClearBtn?.classList.add("hidden");
+  hideRelationshipError();
+}
 
 // Opening upload modal
 function openUploadModal() {
@@ -1123,7 +1930,46 @@ function handleUploadFiles(files) {
 }
 
 // Opening modal when Upload Document button is clicked
-uploadDocBtn?.addEventListener("click", openUploadModal);
+uploadDocBtn?.addEventListener("click", () => {
+  if (appView === "patients" || appView === "doctors") {
+    openRelationshipModal();
+    return;
+  }
+
+  const modalTitle = document.getElementById("upload-modal-title");
+
+  if (modalTitle) {
+    modalTitle.textContent = appView === "patient-records" ? "Add Document" : "Upload Document";
+  }
+
+  openUploadModal();
+});
+
+relationshipModalClose?.addEventListener("click", closeRelationshipModal);
+
+relationshipModal?.addEventListener("click", (e) => {
+  if (e.target === relationshipModal) closeRelationshipModal();
+});
+
+relationshipSearchInput?.addEventListener("input", () => {
+  relationshipSearchClearBtn?.classList.toggle("hidden", !relationshipSearchInput.value);
+  renderRelationshipCandidates();
+});
+
+relationshipSearchClearBtn?.addEventListener("click", () => {
+  relationshipSearchInput.value = "";
+  relationshipSearchClearBtn.classList.add("hidden");
+  relationshipSearchInput.focus();
+  renderRelationshipCandidates();
+});
+
+relationshipList?.addEventListener("click", async (e) => {
+  const button = e.target.closest("[data-add-user-id]");
+
+  if (!button) return;
+
+  await sendCareTeamRequest(button.dataset.addUserId);
+});
 
 // Closing modal when close button is clicked
 uploadModalClose?.addEventListener("click", closeUploadModal);
@@ -1180,15 +2026,28 @@ async function handleUploadDocumentSubmit(e) {
     return;
   }
 
+  if (isProvider(currentUser) && !selectedPatient?.id) {
+    showUploadError("Select a patient before requesting a document.");
+    return;
+  }
+
   formData.append("file", selectedUploadFile);
-  formData.append("userId", currentUser.id);
+
+  if (isProvider(currentUser)) {
+    formData.append("providerId", currentUser.id);
+    formData.append("patientId", selectedPatient.id);
+  } else {
+    formData.append("userId", currentUser.id);
+  }
+
   formData.append("documentName", formValues.documentName);
   formData.append("documentType", formValues.documentType);
   formData.append("provider", formValues.provider);
   formData.append("documentDate", formValues.documentDate);
 
   try {
-    const res = await fetch("/api/upload", {
+    const uploadUrl = isProvider(currentUser) ? "/api/document-requests" : "/api/upload";
+    const res = await fetch(uploadUrl, {
       method: "POST",
       body: formData,
     });
@@ -1201,9 +2060,16 @@ async function handleUploadDocumentSubmit(e) {
     }
 
     closeUploadModal();
-    showTemporarySuccess("home-success", "Document uploaded successfully!");
+    showTemporarySuccess(
+      "home-success",
+      isProvider(currentUser)
+        ? "Document request sent to the patient."
+        : "Document uploaded successfully!"
+    );
 
-    await loadDocuments();
+    if (!isProvider(currentUser)) {
+      await loadDocuments();
+    }
 
   } catch (err) {
     console.error(err);
@@ -1222,6 +2088,22 @@ const searchClearBtn = document.getElementById("search-clear-btn");
 recordSearchInput?.addEventListener("input", () => {
   searchClearBtn?.classList.toggle("hidden", !recordSearchInput.value);
   updateRecordsClearButton();
+
+  if (appView === "patients") {
+    renderPatientList();
+    return;
+  }
+
+  if (appView === "doctors") {
+    renderDoctorList();
+    return;
+  }
+
+  if (appView === "notifications") {
+    renderNotifications();
+    return;
+  }
+
   renderSortedDocuments();
 });
 
@@ -1230,6 +2112,22 @@ searchClearBtn?.addEventListener("click", () => {
   searchClearBtn.classList.add("hidden");
   recordSearchInput.focus();
   updateRecordsClearButton();
+
+  if (appView === "patients") {
+    renderPatientList();
+    return;
+  }
+
+  if (appView === "doctors") {
+    renderDoctorList();
+    return;
+  }
+
+  if (appView === "notifications") {
+    renderNotifications();
+    return;
+  }
+
   renderSortedDocuments();
 });
 
@@ -1471,7 +2369,13 @@ dateApplyBtn?.addEventListener("click", () => {
   };
 
   updateRecordsClearButton();
-  renderSortedDocuments();
+
+  if (appView === "notifications") {
+    renderNotifications();
+  } else {
+    renderSortedDocuments();
+  }
+
   dateRangeMenu.classList.add("hidden");
 });
 
@@ -1568,6 +2472,22 @@ function resetRecordsFilters() {
   dateRangeMenu?.classList.add("hidden");
 
   updateRecordsClearButton();
+
+  if (appView === "patients") {
+    renderPatientList();
+    return;
+  }
+
+  if (appView === "doctors") {
+    renderDoctorList();
+    return;
+  }
+
+  if (appView === "notifications") {
+    renderNotifications();
+    return;
+  }
+
   renderSortedDocuments();
 }
 
@@ -1578,7 +2498,7 @@ recordsClearBtn?.addEventListener("click", resetRecordsFilters);
 /* ------------------------------------------------------------------------------------------ */
 /* TABLE SORT BUTTONS */
 
-const tableSortButtons = document.querySelectorAll(".table-sort-btn");
+let tableSortButtons = [];
 
 function getNextSortDirection(currentDirection) {
   if (currentDirection === "none") return "asc";
@@ -1592,32 +2512,46 @@ function getSortIcon(direction) {
   return "unfold_more";
 }
 
-tableSortButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const nextDirection = getNextSortDirection(button.dataset.direction);
-    const sortKey = button.dataset.sort;
+function setupTableSortButtons() {
+  tableSortButtons = document.querySelectorAll(".table-sort-btn");
 
-    tableSortButtons.forEach((otherButton) => {
-      otherButton.dataset.direction = "none";
-      otherButton.classList.remove("active");
-      otherButton.querySelector(".material-icons").textContent = "unfold_more";
+  tableSortButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextDirection = getNextSortDirection(button.dataset.direction);
+      const sortKey = button.dataset.sort;
+
+      tableSortButtons.forEach((otherButton) => {
+        otherButton.dataset.direction = "none";
+        otherButton.classList.remove("active");
+        otherButton.querySelector(".material-icons").textContent = "unfold_more";
+      });
+
+      button.dataset.direction = nextDirection;
+      button.querySelector(".material-icons").textContent = getSortIcon(nextDirection);
+
+      if (nextDirection !== "none") {
+        button.classList.add("active");
+      }
+
+      activeRecordsSort = {
+        key: nextDirection === "none" ? "" : sortKey,
+        direction: nextDirection,
+      };
+
+      if (appView === "patients") {
+        renderPatientList();
+        return;
+      }
+
+      if (appView === "doctors" || appView === "doctor-details") {
+        renderDoctorList();
+        return;
+      }
+
+      renderSortedDocuments();
     });
-
-    button.dataset.direction = nextDirection;
-    button.querySelector(".material-icons").textContent = getSortIcon(nextDirection);
-
-    if (nextDirection !== "none") {
-      button.classList.add("active");
-    }
-
-    activeRecordsSort = {
-      key: nextDirection === "none" ? "" : sortKey,
-      direction: nextDirection,
-    };
-
-    renderSortedDocuments();
   });
-});
+}
 
 
 
@@ -1660,6 +2594,29 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("click", (e) => {
+  const patientButton = e.target.closest(".patient-link");
+
+  if (patientButton?.dataset.patientId) {
+    const patient = patients.find((item) => String(item.id) === patientButton.dataset.patientId);
+
+    if (patient) showProviderPatientRecordsView(patient);
+    return;
+  }
+
+  if (patientButton?.dataset.doctorId) {
+    const doctor = doctors.find((item) => String(item.id) === patientButton.dataset.doctorId);
+
+    if (doctor) showPatientDoctorDetailsView(doctor);
+    return;
+  }
+
+  const relationshipDeleteButton = e.target.closest("[data-relationship-delete-id]");
+
+  if (relationshipDeleteButton) {
+    deleteRelationship(relationshipDeleteButton.dataset.relationshipDeleteId);
+    return;
+  }
+
   const option = e.target.closest(".table-menu-option");
 
   if (!option) return;
@@ -1688,6 +2645,82 @@ document.addEventListener("click", (e) => {
   if (action === "delete" && id) {
     deleteDocument(id);
   }
+});
+
+document.addEventListener("click", async (e) => {
+  const requestButton = e.target.closest("[data-request-action]");
+
+  if (!requestButton) return;
+
+  const action = requestButton.dataset.requestAction;
+  const filePath = requestButton.dataset.filePath;
+  const requestId = requestButton.dataset.requestId;
+
+  if (action === "view" && filePath) {
+    window.open(filePath, "_blank");
+    return;
+  }
+
+  if ((action === "approve" || action === "reject") && requestId) {
+    await updateDocumentRequest(requestId, action);
+  }
+});
+
+document.addEventListener("click", async (e) => {
+  const requestButton = e.target.closest("[data-care-team-action]");
+
+  if (!requestButton) return;
+
+  const action = requestButton.dataset.careTeamAction;
+  const requestId = requestButton.dataset.requestId;
+
+  if ((action === "approve" || action === "reject") && requestId) {
+    await updateCareTeamRequest(requestId, action);
+  }
+});
+
+document.querySelectorAll(".nav-btn").forEach((button) => {
+  button.addEventListener("click", () => {
+    const target = button.dataset.target;
+    const currentUser = getCurrentUser();
+
+    if (target === undefined) return;
+
+    document.querySelectorAll(".nav-btn").forEach((item) => {
+      item.classList.toggle("active", item === button);
+    });
+
+    if (target === "profile") {
+      showProfileView();
+      return;
+    }
+
+    if (target === "notifications" && (isPatient(currentUser) || isProvider(currentUser))) {
+      showPatientNotificationsView();
+      return;
+    }
+
+    if (target === "care-team" && isPatient(currentUser)) {
+      showPatientDoctorsView();
+      return;
+    }
+
+    if (isProvider(currentUser)) {
+      showProviderPatientsView();
+      return;
+    }
+
+    showPatientRecordsView();
+  });
+});
+
+patientBackBtn?.addEventListener("click", () => {
+  if (appView === "doctor-details") {
+    showPatientDoctorsView();
+    return;
+  }
+
+  showProviderPatientsView();
 });
 
 document.addEventListener("click", (e) => {
@@ -1721,6 +2754,364 @@ async function deleteDocument(id) {
   }
 }
 
+async function deleteRelationship(id) {
+  try {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser?.id || !id) return;
+
+    const res = await fetch(`/api/care-team-requests/${id}?userId=${encodeURIComponent(currentUser.id)}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not remove connection.");
+      return;
+    }
+
+    showTemporarySuccess("home-success", "Connection removed.");
+
+    if (appView === "patients") {
+      await loadPatients();
+    }
+
+    if (appView === "doctors" || appView === "doctor-details") {
+      await loadDoctors();
+      if (appView === "doctor-details") showPatientDoctorsView();
+    }
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function updateDocumentRequest(id, action) {
+  try {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser?.id) return;
+
+    const res = await fetch(`/api/document-requests/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patientId: currentUser.id,
+        action,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not update request.");
+      return;
+    }
+
+    showTemporarySuccess(
+      "home-success",
+      action === "approve" ? "Document approved and added to your records." : "Document request rejected."
+    );
+
+    await loadDocumentRequests();
+
+    if (appView === "records") {
+      await loadDocuments();
+    }
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function sendCareTeamRequest(targetUserId) {
+  try {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser?.id) return;
+
+    hideRelationshipError();
+
+    const res = await fetch("/api/care-team-requests", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requesterId: currentUser.id,
+        targetUserId,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      showRelationshipError(data.message || "Could not send request.");
+      return;
+    }
+
+    closeRelationshipModal();
+    showTemporarySuccess(
+      "home-success",
+      isProvider(currentUser)
+        ? "Patient request sent."
+        : "Doctor request sent."
+    );
+
+  } catch (err) {
+    console.error(err);
+    showRelationshipError("System error, please try again.");
+  }
+}
+
+async function updateCareTeamRequest(id, action) {
+  try {
+    const currentUser = getCurrentUser();
+
+    if (!currentUser?.id) return;
+
+    const res = await fetch(`/api/care-team-requests/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        action,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      console.error(data.message || "Could not update request.");
+      return;
+    }
+
+    showTemporarySuccess(
+      "home-success",
+      action === "approve" ? "Connection approved." : "Connection rejected."
+    );
+
+    await loadCareTeamRequests();
+
+    if (appView === "patients" && isProvider(currentUser)) {
+      await loadPatients();
+    }
+
+    if (appView === "doctors" && isPatient(currentUser)) {
+      await loadDoctors();
+    }
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function handleProfileSubmit(e) {
+  e.preventDefault();
+
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id) return;
+
+  const formValues = getFormData(profileForm);
+
+  try {
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        firstname: formValues.firstname,
+        lastname: formValues.lastname,
+        email: formValues.email,
+      medicalInfo: {
+        dateOfBirth: formValues.dateOfBirth,
+        bloodType: formValues.bloodType,
+        allergies: formValues.allergies,
+        conditions: formValues.conditions,
+        medications: formValues.medications,
+        emergencyContact: formValues.emergencyContact,
+        specialty: formValues.specialty,
+        phone: formValues.phone,
+        contactEmail: formValues.contactEmail,
+        workplace: formValues.workplace,
+        address: formValues.address,
+      },
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.ok) {
+      showTemporarySuccess("home-success", data.message || "Could not update profile.");
+      return;
+    }
+
+    saveCurrentUser({
+      ...currentUser,
+      firstname: data.user.firstname,
+      lastname: data.user.lastname,
+      email: data.user.email,
+    });
+
+    populateHome(getCurrentUser());
+    fillProfileForm(data.user);
+    initialProfileSnapshot = getProfileSnapshot();
+    updateProfileSaveButton();
+    showTemporarySuccess("home-success", "Profile updated successfully.");
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function showProfilePasswordError(message) {
+  const errorText = profilePasswordError?.querySelector(".msg-error-text");
+
+  if (errorText) errorText.textContent = message;
+  profilePasswordError?.classList.remove("hidden");
+}
+
+function hideProfilePasswordError() {
+  const errorText = profilePasswordError?.querySelector(".msg-error-text");
+
+  if (errorText) errorText.textContent = "";
+  profilePasswordError?.classList.add("hidden");
+}
+
+function showProfilePasswordSuccess(message) {
+  const successText = profilePasswordSuccess?.querySelector(".msg-success-text");
+
+  if (successText) successText.textContent = message;
+  profilePasswordSuccess?.classList.remove("hidden");
+}
+
+function hideProfilePasswordSuccess() {
+  const successText = profilePasswordSuccess?.querySelector(".msg-success-text");
+
+  if (successText) successText.textContent = "";
+  profilePasswordSuccess?.classList.add("hidden");
+}
+
+function openProfilePasswordModal() {
+  verifiedProfilePasswordCode = "";
+  hideProfilePasswordError();
+  hideProfilePasswordSuccess();
+  profilePasswordCodeForm?.classList.remove("hidden");
+  profilePasswordVerifyForm?.classList.add("hidden");
+  profilePasswordChangeForm?.classList.add("hidden");
+  profilePasswordVerifyForm?.reset();
+  profilePasswordChangeForm?.reset();
+  profilePasswordModal?.classList.remove("hidden");
+}
+
+function closeProfilePasswordModal() {
+  verifiedProfilePasswordCode = "";
+  profilePasswordModal?.classList.add("hidden");
+  hideProfilePasswordError();
+  hideProfilePasswordSuccess();
+  profilePasswordCodeForm?.classList.remove("hidden");
+  profilePasswordVerifyForm?.classList.add("hidden");
+  profilePasswordChangeForm?.classList.add("hidden");
+  profilePasswordVerifyForm?.reset();
+  profilePasswordChangeForm?.reset();
+}
+
+async function handleProfilePasswordCodeSubmit(e) {
+  e.preventDefault();
+
+  const currentUser = getCurrentUser();
+
+  if (!currentUser?.id) return;
+
+  hideProfilePasswordError();
+  hideProfilePasswordSuccess();
+
+  try {
+    const { res, data } = await postJSON("/api/profile/password-code", {
+      userId: currentUser.id,
+    });
+
+    if (!res.ok || !data.ok) {
+      showProfilePasswordError(data.message || "Could not send verification code.");
+      return;
+    }
+
+    profilePasswordCodeForm?.classList.add("hidden");
+    profilePasswordVerifyForm?.classList.remove("hidden");
+    showProfilePasswordSuccess("Verification code sent to your email.");
+
+  } catch (err) {
+    console.error(err);
+    showProfilePasswordError("System error, please try again.");
+  }
+}
+
+async function handleProfilePasswordVerifySubmit(e) {
+  e.preventDefault();
+
+  const currentUser = getCurrentUser();
+  const formValues = getFormData(profilePasswordVerifyForm);
+
+  if (!currentUser?.id) return;
+
+  hideProfilePasswordError();
+  hideProfilePasswordSuccess();
+
+  try {
+    const { res, data } = await postJSON("/api/profile/password-verify", {
+      userId: currentUser.id,
+      code: formValues.code,
+    });
+
+    if (!res.ok || !data.ok) {
+      showProfilePasswordError(data.message || "Could not verify code.");
+      return;
+    }
+
+    verifiedProfilePasswordCode = formValues.code;
+    profilePasswordVerifyForm?.classList.add("hidden");
+    profilePasswordChangeForm?.classList.remove("hidden");
+    showProfilePasswordSuccess("Code verified. Enter your new password.");
+
+  } catch (err) {
+    console.error(err);
+    showProfilePasswordError("System error, please try again.");
+  }
+}
+
+async function handleProfilePasswordChangeSubmit(e) {
+  e.preventDefault();
+
+  const currentUser = getCurrentUser();
+  const formValues = getFormData(profilePasswordChangeForm);
+
+  if (!currentUser?.id || !verifiedProfilePasswordCode) return;
+
+  hideProfilePasswordError();
+  hideProfilePasswordSuccess();
+
+  try {
+    const { res, data } = await postJSON("/api/profile/password", {
+      userId: currentUser.id,
+      code: verifiedProfilePasswordCode,
+      newPassword: formValues.newPassword,
+      confirmPassword: formValues.confirmPassword,
+    });
+
+    if (!res.ok || !data.ok) {
+      showProfilePasswordError(data.message || "Could not update password.");
+      return;
+    }
+
+    closeProfilePasswordModal();
+    showTemporarySuccess("home-success", "Password updated successfully.");
+
+  } catch (err) {
+    console.error(err);
+    showProfilePasswordError("System error, please try again.");
+  }
+}
+
 
 
 /* ------------------------------------------------------------------------------------------ */
@@ -1734,6 +3125,16 @@ function setupFormHandlers() {
   verificationForm?.addEventListener("submit", handleVerificationSubmit);
   newPasswordForm?.addEventListener("submit", handleNewPasswordSubmit);
   uploadDocumentForm?.addEventListener("submit", handleUploadDocumentSubmit);
+  profileForm?.addEventListener("submit", handleProfileSubmit);
+  profileForm?.addEventListener("input", updateProfileSaveButton);
+  profilePasswordCodeForm?.addEventListener("submit", handleProfilePasswordCodeSubmit);
+  profilePasswordVerifyForm?.addEventListener("submit", handleProfilePasswordVerifySubmit);
+  profilePasswordChangeForm?.addEventListener("submit", handleProfilePasswordChangeSubmit);
+  profilePasswordBtn?.addEventListener("click", openProfilePasswordModal);
+  profilePasswordClose?.addEventListener("click", closeProfilePasswordModal);
+  profilePasswordModal?.addEventListener("click", (e) => {
+    if (e.target === profilePasswordModal) closeProfilePasswordModal();
+  });
 }
 
 

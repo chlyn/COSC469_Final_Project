@@ -12,6 +12,7 @@ const open = (...args) => import("open").then((m) => m.default(...args)); // Ope
 const path = require("path");                                             // Node's path module builds file paths accross the os
 const multer = require("multer");                                         // Multer handles file uploads
 const fs = require("fs");                                                 // File system helper
+const { Op } = require("sequelize");                                      // Sequelize operators for advanced filters
 
 // Variables
 const app = express();                                                    // Creates the express server instance
@@ -30,7 +31,7 @@ app.use(express.json());                                                  // All
 app.use("/uploads", express.static(uploadsDir));                          // Allows express to serve uploaded files
 
 // Sequelize database connection and models
-const { sequelize, User, PasswordResetCode, Document } = require("./models"); // Importing the Sequelize instance from the models folder (already configured using config.js and .env)
+const { sequelize, User, PasswordResetCode, Document, DocumentRequest, CareTeamRequest } = require("./models"); // Importing the Sequelize instance from the models folder (already configured using config.js and .env)
 
 // Testing the connection to the MySQL database
 sequelize.authenticate()
@@ -244,7 +245,7 @@ app.post("/api/login", async (req, res) => {
     // Querying the database to check if user exists
     const user = await User.findOne({
       where: { email },
-      attributes: ["id", "firstname", "lastname", "email", "password_hash", "emailVerified"],
+      attributes: ["id", "firstname", "lastname", "email", "password_hash", "accountType", "emailVerified"],
     });
 
     // If user does not exist, then send invalid login error
@@ -276,6 +277,7 @@ app.post("/api/login", async (req, res) => {
         firstname: user.firstname,
         lastname: user.lastname,
         email: user.email,
+        accountType: user.accountType,
       },
     });
 
@@ -423,7 +425,7 @@ app.post("/api/verification", async (req, res) => {
     if (purpose === "create-account") {
       const user = await User.findOne({
         where: { email },
-        attributes: ["id", "firstname", "lastname", "email", "emailVerified"],
+        attributes: ["id", "firstname", "lastname", "email", "accountType", "emailVerified"],
       });
 
       if (!user) {
@@ -443,6 +445,7 @@ app.post("/api/verification", async (req, res) => {
           firstname: user.firstname,
           lastname: user.lastname,
           email: user.email,
+          accountType: user.accountType,
         },
       });
     }
@@ -537,6 +540,645 @@ app.post("/api/new-password", async (req, res) => {
 
 
 // -------------------------------------------------------------------------------------------------------------------------------
+// PROFILE //
+
+function parseMedicalInfo(value) {
+  if (!value) return {};
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+}
+
+function buildProfileUser(user) {
+  return {
+    id: user.id,
+    firstname: user.firstname,
+    lastname: user.lastname,
+    email: user.email,
+    accountType: user.accountType,
+    medicalInfo: parseMedicalInfo(user.medicalInfo),
+  };
+}
+
+app.get("/api/profile", async (req, res) => {
+
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const user = await User.findByPk(userId, {
+      attributes: ["id", "firstname", "lastname", "email", "accountType", "medicalInfo"],
+    });
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    return res.json({ ok: true, user: buildProfileUser(user) });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load profile" });
+
+  }
+
+});
+
+app.patch("/api/profile", async (req, res) => {
+
+  try {
+    const { userId, firstname, lastname, email, medicalInfo = {} } = req.body;
+
+    if (!userId || !firstname || !lastname || !email) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const existingUser = await User.findOne({ where: { email } });
+
+    if (existingUser && existingUser.id !== user.id) {
+      return res.status(409).json({ ok: false, message: "This email is already taken." });
+    }
+
+    await user.update({
+      firstname,
+      lastname,
+      email,
+      medicalInfo: JSON.stringify(medicalInfo),
+    });
+
+    return res.json({ ok: true, user: buildProfileUser(user) });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not update profile" });
+
+  }
+
+});
+
+app.post("/api/profile/password-code", async (req, res) => {
+
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code_hash = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await PasswordResetCode.destroy({
+      where: { email: user.email },
+    });
+
+    await PasswordResetCode.create({
+      email: user.email,
+      code_hash,
+      expires_at: expiresAt,
+    });
+
+    await sendVerificationEmail({
+      to: user.email,
+      firstname: user.firstname,
+      code,
+      subject: "Your SoftCare profile password code",
+      heading: "Confirm password change",
+      intro: "Use this verification code to continue changing your SoftCare password.",
+      securityNote: "If you did not request this change, please ignore this email.",
+    });
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not send verification code" });
+
+  }
+
+});
+
+app.post("/api/profile/password-verify", async (req, res) => {
+
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const resetRow = await PasswordResetCode.findOne({
+      where: { email: user.email },
+      attributes: ["email", "code_hash", "expires_at"],
+    });
+
+    if (!resetRow) {
+      return res.status(401).json({ ok: false, message: "Invalid code. Try again." });
+    }
+
+    if (new Date(resetRow.expires_at) < new Date()) {
+      return res.status(401).json({ ok: false, message: "Your code has expired. Please request a new one." });
+    }
+
+    const isCodeMatch = await bcrypt.compare(code, resetRow.code_hash);
+
+    if (!isCodeMatch) {
+      return res.status(401).json({ ok: false, message: "Invalid code. Try again." });
+    }
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not verify code" });
+
+  }
+
+});
+
+app.post("/api/profile/password", async (req, res) => {
+
+  try {
+    const { userId, code, newPassword, confirmPassword } = req.body;
+
+    if (!userId || !code || !newPassword || !confirmPassword) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ ok: false, message: "New password and confirm password do not match" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const resetRow = await PasswordResetCode.findOne({
+      where: { email: user.email },
+      attributes: ["email", "code_hash", "expires_at"],
+    });
+
+    if (!resetRow) {
+      return res.status(401).json({ ok: false, message: "Invalid code. Try again." });
+    }
+
+    if (new Date(resetRow.expires_at) < new Date()) {
+      return res.status(401).json({ ok: false, message: "Your code has expired. Please request a new one." });
+    }
+
+    const isCodeMatch = await bcrypt.compare(code, resetRow.code_hash);
+
+    if (!isCodeMatch) {
+      return res.status(401).json({ ok: false, message: "Invalid code. Try again." });
+    }
+
+    const isSamePassword = await bcrypt.compare(newPassword, user.password_hash);
+
+    if (isSamePassword) {
+      return res.status(400).json({ ok: false, message: "Please choose a password you haven't used before" });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+
+    await user.update({ password_hash });
+
+    await PasswordResetCode.destroy({
+      where: { email: user.email },
+    });
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not update password" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// GET PATIENTS //
+
+app.get("/api/patients", async (req, res) => {
+
+  try {
+    const { providerId } = req.query;
+
+    if (!providerId) {
+      return res.status(400).json({ ok: false, message: "Missing provider" });
+    }
+
+    const provider = await User.findByPk(providerId);
+
+    if (!provider || provider.accountType !== "Healthcare Provider") {
+      return res.status(403).json({ ok: false, message: "Provider access required" });
+    }
+
+    const relationships = await CareTeamRequest.findAll({
+      where: {
+        providerId,
+        status: "approved",
+      },
+      include: [{
+        model: User,
+        as: "patient",
+        attributes: ["id", "firstname", "lastname", "email", "medicalInfo", "createdAt"],
+      }],
+      order: [[{ model: User, as: "patient" }, "lastname", "ASC"], [{ model: User, as: "patient" }, "firstname", "ASC"]],
+    });
+
+    const patients = relationships.map((relationship) => ({
+      ...buildProfileUser(relationship.patient),
+      relationshipId: relationship.id,
+      createdAt: relationship.patient.createdAt,
+    }));
+
+    return res.json({ ok: true, patients });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load patients" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// GET DOCTORS //
+
+app.get("/api/doctors", async (req, res) => {
+
+  try {
+    const { patientId } = req.query;
+
+    if (!patientId) {
+      return res.status(400).json({ ok: false, message: "Missing patient" });
+    }
+
+    const patient = await User.findByPk(patientId);
+
+    if (!patient || patient.accountType !== "Patient") {
+      return res.status(403).json({ ok: false, message: "Patient access required" });
+    }
+
+    const relationships = await CareTeamRequest.findAll({
+      where: {
+        patientId,
+        status: "approved",
+      },
+      include: [{
+        model: User,
+        as: "provider",
+        attributes: ["id", "firstname", "lastname", "email", "medicalInfo", "createdAt"],
+      }],
+      order: [[{ model: User, as: "provider" }, "lastname", "ASC"], [{ model: User, as: "provider" }, "firstname", "ASC"]],
+    });
+
+    const doctors = relationships.map((relationship) => ({
+      ...buildProfileUser(relationship.provider),
+      relationshipId: relationship.id,
+      createdAt: relationship.provider.createdAt,
+    }));
+
+    return res.json({ ok: true, doctors });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load doctors" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// SEARCH USERS FOR CARE TEAM //
+
+app.get("/api/care-team-candidates", async (req, res) => {
+
+  try {
+    const { requesterId } = req.query;
+
+    if (!requesterId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const requester = await User.findByPk(requesterId);
+
+    if (!requester || !["Patient", "Healthcare Provider"].includes(requester.accountType)) {
+      return res.status(403).json({ ok: false, message: "Invalid account type" });
+    }
+
+    const targetAccountType = requester.accountType === "Patient" ? "Healthcare Provider" : "Patient";
+
+    const users = await User.findAll({
+      where: {
+        accountType: targetAccountType,
+        emailVerified: true,
+      },
+      attributes: ["id", "firstname", "lastname", "email", "medicalInfo", "createdAt"],
+      order: [["lastname", "ASC"], ["firstname", "ASC"]],
+    });
+
+    const relationshipRows = await CareTeamRequest.findAll({
+      where: requester.accountType === "Patient"
+        ? { patientId: requester.id }
+        : { providerId: requester.id },
+      order: [["updatedAt", "DESC"]],
+    });
+
+    const relationshipByUserId = new Map();
+
+    relationshipRows.forEach((relationship) => {
+      const targetId = requester.accountType === "Patient" ? relationship.providerId : relationship.patientId;
+
+      if (!relationshipByUserId.has(targetId)) {
+        relationshipByUserId.set(targetId, relationship);
+      }
+    });
+
+    const candidates = users.map((user) => {
+      const relationship = relationshipByUserId.get(user.id);
+
+      return {
+        ...buildProfileUser(user),
+        createdAt: user.createdAt,
+        relationshipStatus: relationship?.status || "",
+      };
+    });
+
+    return res.json({ ok: true, users: candidates });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load users" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// CARE TEAM REQUESTS //
+
+app.get("/api/care-team-requests", async (req, res) => {
+
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const where = {
+      status: "pending",
+      requestedByUserId: { [Op.ne]: user.id },
+    };
+
+    if (user.accountType === "Patient") {
+      where.patientId = user.id;
+    } else if (user.accountType === "Healthcare Provider") {
+      where.providerId = user.id;
+    } else {
+      return res.json({ ok: true, requests: [] });
+    }
+
+    const requests = await CareTeamRequest.findAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: "patient",
+          attributes: ["id", "firstname", "lastname", "email"],
+        },
+        {
+          model: User,
+          as: "provider",
+          attributes: ["id", "firstname", "lastname", "email"],
+        },
+        {
+          model: User,
+          as: "requester",
+          attributes: ["id", "firstname", "lastname", "email", "accountType"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.json({ ok: true, requests });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load care team requests" });
+
+  }
+
+});
+
+app.post("/api/care-team-requests", async (req, res) => {
+
+  try {
+    const { requesterId, targetUserId } = req.body;
+
+    if (!requesterId || !targetUserId) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const requester = await User.findByPk(requesterId);
+    const targetUser = await User.findByPk(targetUserId);
+
+    if (!requester || !targetUser) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    if (requester.accountType === targetUser.accountType || !["Patient", "Healthcare Provider"].includes(requester.accountType) || !["Patient", "Healthcare Provider"].includes(targetUser.accountType)) {
+      return res.status(400).json({ ok: false, message: "Select a patient and a healthcare provider" });
+    }
+
+    const patientId = requester.accountType === "Patient" ? requester.id : targetUser.id;
+    const providerId = requester.accountType === "Healthcare Provider" ? requester.id : targetUser.id;
+
+    const existingRequest = await CareTeamRequest.findOne({
+      where: {
+        patientId,
+        providerId,
+        status: { [Op.in]: ["pending", "approved"] },
+      },
+    });
+
+    if (existingRequest) {
+      return res.status(409).json({
+        ok: false,
+        message: existingRequest.status === "approved"
+          ? "This connection already exists."
+          : "A request is already pending.",
+      });
+    }
+
+    const request = await CareTeamRequest.create({
+      patientId,
+      providerId,
+      requestedByUserId: requester.id,
+      status: "pending",
+    });
+
+    return res.json({ ok: true, request });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not send request" });
+
+  }
+
+});
+
+app.patch("/api/care-team-requests/:id", async (req, res) => {
+
+  try {
+    const { userId, action } = req.body;
+
+    if (!userId || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const request = await CareTeamRequest.findOne({
+      where: {
+        id: req.params.id,
+        status: "pending",
+      },
+    });
+
+    if (!request) {
+      return res.status(404).json({ ok: false, message: "Request not found" });
+    }
+
+    const isRecipient =
+      request.requestedByUserId !== user.id &&
+      ((user.accountType === "Patient" && request.patientId === user.id) ||
+       (user.accountType === "Healthcare Provider" && request.providerId === user.id));
+
+    if (!isRecipient) {
+      return res.status(403).json({ ok: false, message: "You cannot update this request" });
+    }
+
+    await request.update({ status: action === "approve" ? "approved" : "rejected" });
+
+    return res.json({ ok: true, request });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not update request" });
+
+  }
+
+});
+
+app.delete("/api/care-team-requests/:id", async (req, res) => {
+
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ ok: false, message: "Missing user" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "User not found" });
+    }
+
+    const request = await CareTeamRequest.findOne({
+      where: {
+        id: req.params.id,
+        status: "approved",
+      },
+    });
+
+    if (!request) {
+      return res.status(404).json({ ok: false, message: "Relationship not found" });
+    }
+
+    const canDelete =
+      (user.accountType === "Patient" && request.patientId === user.id) ||
+      (user.accountType === "Healthcare Provider" && request.providerId === user.id);
+
+    if (!canDelete) {
+      return res.status(403).json({ ok: false, message: "You cannot delete this relationship" });
+    }
+
+    await request.destroy();
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not delete relationship" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
 // GET DOCUMENTS //
 
 app.get("/api/documents", async (req, res) => {
@@ -559,6 +1201,152 @@ app.get("/api/documents", async (req, res) => {
 
     console.error(err);
     return res.status(500).json({ ok: false, message: "Could not load documents" });
+
+  }
+
+});
+
+
+
+// -------------------------------------------------------------------------------------------------------------------------------
+// DOCUMENT REQUESTS //
+
+app.get("/api/document-requests", async (req, res) => {
+
+  try {
+    const { patientId, status = "pending" } = req.query;
+
+    if (!patientId) {
+      return res.status(400).json({ ok: false, message: "Missing patient" });
+    }
+
+    const requests = await DocumentRequest.findAll({
+      where: { patientId, status },
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.json({ ok: true, requests });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not load requests" });
+
+  }
+
+});
+
+app.post("/api/document-requests", upload.single("file"), async (req, res) => {
+
+  try {
+    const file = req.file;
+    const { providerId, patientId, documentName, documentType, provider, documentDate } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ ok: false, message: "No file uploaded" });
+    }
+
+    if (!providerId || !patientId || !documentName || !documentType || !provider || !documentDate) {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error("Could not remove incomplete request upload:", err);
+      });
+
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const providerUser = await User.findByPk(providerId);
+    const patient = await User.findByPk(patientId);
+
+    if (!providerUser || providerUser.accountType !== "Healthcare Provider" || !patient || patient.accountType !== "Patient") {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error("Could not remove unauthorized request upload:", err);
+      });
+
+      return res.status(403).json({ ok: false, message: "Invalid provider or patient" });
+    }
+
+    const request = await DocumentRequest.create({
+      patientId,
+      providerId,
+      documentName,
+      documentType,
+      provider,
+      documentDate,
+      originalName: file.originalname,
+      fileName: file.filename,
+      filePath: `/uploads/${file.filename}`,
+      size: file.size,
+      mimeType: file.mimetype,
+      status: "pending",
+    });
+
+    return res.json({ ok: true, request });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Request failed" });
+
+  }
+
+});
+
+app.patch("/api/document-requests/:id", async (req, res) => {
+
+  try {
+    const { patientId, action } = req.body;
+
+    if (!patientId || !["approve", "reject"].includes(action)) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
+
+    const request = await DocumentRequest.findOne({
+      where: {
+        id: req.params.id,
+        patientId,
+        status: "pending",
+      },
+    });
+
+    if (!request) {
+      return res.status(404).json({ ok: false, message: "Request not found" });
+    }
+
+    if (action === "reject") {
+      const storedFilePath = path.join(__dirname, request.filePath.replace(/^\/+/, ""));
+
+      await request.update({ status: "rejected" });
+
+      fs.unlink(storedFilePath, (err) => {
+        if (err && err.code !== "ENOENT") {
+          console.error("Could not remove rejected requested file:", err);
+        }
+      });
+
+      return res.json({ ok: true });
+    }
+
+    const document = await Document.create({
+      userId: request.patientId,
+      documentName: request.documentName,
+      documentType: request.documentType,
+      provider: request.provider,
+      documentDate: request.documentDate,
+      originalName: request.originalName,
+      fileName: request.fileName,
+      filePath: request.filePath,
+      size: request.size,
+      mimeType: request.mimeType,
+    });
+
+    await request.update({ status: "approved" });
+
+    return res.json({ ok: true, document });
+
+  } catch (err) {
+
+    console.error(err);
+    return res.status(500).json({ ok: false, message: "Could not update request" });
 
   }
 

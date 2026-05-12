@@ -46,6 +46,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: true
     },
+    medicalInfo: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
 
   }, {
 

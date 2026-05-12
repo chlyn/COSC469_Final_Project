@@ -350,10 +350,25 @@ body {
 }
 
 .form-label select:focus,
-.form-label input:focus {
+.form-label input:focus,
+.form-label textarea:focus {
   outline: none;
   border-color: var(--color-primary-default);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-default) 10%, transparent);
+}
+
+.form-label textarea {
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--divider-default);
+  background: color-mix(in srgb, var(--background-secondary) 35%, #ffffff);
+  color: var(--text-primary);
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: vertical;
 }
 
 /* Name Field */
@@ -604,7 +619,27 @@ input[type="number"] {
 }
 
 .nav-btn .nav-text {
+  flex: 1;
   color: inherit;
+}
+
+.sidebar-footer {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.nav-badge {
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--color-accent-default);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .user-profile {
@@ -702,10 +737,12 @@ input[type="number"] {
 }
 
 .header-title {
+  height: 40px;
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
+  gap: 12px;
 }
 
 .header-title h1 {
@@ -714,6 +751,26 @@ input[type="number"] {
   line-height: 1.2;
   font-weight: 700;
   color: var(--text-primary);
+}
+
+.header-back-btn {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--background-default);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.header-back-btn:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--background-default) 92%, var(--color-primary-default));
 }
 
 .header-btn {
@@ -1411,6 +1468,298 @@ input[type="number"] {
   font-weight: 500;
   font-size: 13px;
   color: var(--text-primary);
+}
+
+.patient-link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.patient-link:hover {
+  text-decoration: underline;
+}
+
+.patient-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--divider-default);
+  border-radius: 12px;
+  background: var(--background-default);
+}
+
+.patient-detail-heading {
+  grid-column: 1 / -1;
+}
+
+.patient-detail-heading h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.patient-detail-heading p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.patient-detail-item {
+  min-width: 0;
+}
+
+.patient-detail-label {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.patient-detail-value {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.notifications-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.notification-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--divider-default);
+  border-radius: 12px;
+  background: var(--background-default);
+}
+
+.notification-title {
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.notification-meta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-action-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--divider-default);
+  background: var(--background-default);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notification-action-btn.approve {
+  border: none;
+  background: var(--color-primary-default);
+  color: var(--text-on-primary);
+}
+
+.notification-action-btn:hover {
+  border-color: var(--border-strong);
+}
+
+.profile-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-right: 4px;
+}
+
+.profile-section {
+  padding: 20px;
+  border: 1px solid var(--divider-default);
+  border-radius: 12px;
+  background: var(--background-default);
+}
+
+.profile-section h2 {
+  margin: 0 0 18px;
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+.profile-full {
+  grid-column: 1 / -1;
+}
+
+.secondary-action-btn {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--divider-default);
+  border-radius: 999px;
+  background: var(--background-default);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.secondary-action-btn:hover {
+  border-color: var(--border-strong);
+  background: var(--background-secondary);
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.profile-save-btn {
+  width: auto;
+  min-width: 140px;
+  margin: 0;
+}
+
+.profile-save-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.profile-modal-description {
+  margin: 16px 0 0;
+}
+
+.relationship-search {
+  margin-top: 16px;
+  max-width: none;
+}
+
+.relationship-list {
+  margin-top: 16px;
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.relationship-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--divider-default);
+  border-radius: 12px;
+  background: var(--background-secondary);
+}
+
+.relationship-name {
+  margin: 0 0 2px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.relationship-email {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.relationship-add-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-primary-default);
+  color: var(--text-on-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.relationship-add-btn:hover {
+  background: var(--color-primary-hover);
+}
+
+.relationship-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.icon-action-btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--danger-default);
+  cursor: pointer;
+}
+
+.icon-action-btn:hover {
+  background: var(--danger-bg);
+}
+
+.empty-state {
+  padding: 40px 16px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 14px;
 }
 
 .table-sort-btn {

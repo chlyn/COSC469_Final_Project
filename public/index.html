@@ -372,27 +372,31 @@
                         <span class="nav-text">My Records</span>
                     </button>
 
-                    <button class="nav-btn" data-target="settings">
-                        <span class="material-icons">settings</span>
-                        <span class="nav-text">Settings</span>
+                    <button class="nav-btn hidden" id="care-team-nav-btn" data-target="care-team">
+                        <span class="material-icons">groups</span>
+                        <span class="nav-text">My Doctors</span>
                     </button>
-                
+
+                    <button class="nav-btn hidden" id="notifications-nav-btn" data-target="notifications">
+                        <span class="material-icons">notifications</span>
+                        <span class="nav-text">Notifications</span>
+                        <span class="nav-badge hidden" id="notifications-count">0</span>
+                    </button>
+
+                    <button class="nav-btn" id="profile-nav-btn" data-target="profile">
+                        <span class="material-icons">account_circle</span>
+                        <span class="nav-text">My Profile</span>
+                    </button>
+
                 </nav>
 
-                <div class="user-profile">
+                <div class="sidebar-footer">
 
-                    <button class="profile-btn" id="sidebar-profile-btn">
-
-                        <div class="profile-img">
-                            <span>JD</span>
-                        </div>
-
-                        <div class="profile-info">
-                            <p class="profile-name">Jane Doe</p>
-                        </div>
-
+                    <button class="nav-btn logout-btn" id="signout-btn" type="button">
+                        <span class="material-icons">logout</span>
+                        <span class="nav-text">Log Out</span>
                     </button>
-
+                
                 </div>
 
             </div>
@@ -407,15 +411,21 @@
                 <div class="header">
 
                     <div class="header-title">
-                        <h1>My Records</h1>
+                        <button class="header-back-btn hidden" type="button" id="patient-back-btn" aria-label="Back to patients">
+                            <span class="material-icons">arrow_back</span>
+                        </button>
+
+                        <h1 id="page-title">My Records</h1>
                     </div>
 
                     <button class="header-btn" id="upload-doc-btn">
                         <span class="material-icons">add</span>
-                        Upload Document
+                        <span id="upload-doc-btn-text">Upload Document</span>
                     </button>
 
                 </div>
+
+                <div class="main-content patient-details hidden" id="patient-details"></div>
 
                 <div class="main-content">
 
@@ -514,6 +524,109 @@
 
                     </div>
 
+                    <div class="notifications-list hidden" id="notifications-list"></div>
+
+                    <form class="profile-panel hidden" id="profile-form">
+
+                        <div class="profile-section">
+                            <h2>Account Information</h2>
+
+                            <div class="profile-grid">
+                                <label class="form-label">
+                                    First Name
+                                    <input type="text" name="firstname" required />
+                                </label>
+
+                                <label class="form-label">
+                                    Last Name
+                                    <input type="text" name="lastname" required />
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Email
+                                    <input type="email" name="email" required />
+                                </label>
+                            </div>
+
+                            <button class="secondary-action-btn" type="button" id="profile-password-btn">
+                                <span class="material-icons">lock_reset</span>
+                                Change Password
+                            </button>
+                        </div>
+
+                        <div class="profile-section" id="patient-profile-section">
+                            <h2>Medical Information</h2>
+
+                            <div class="profile-grid">
+                                <label class="form-label">
+                                    Date of Birth
+                                    <input type="date" name="dateOfBirth" />
+                                </label>
+
+                                <label class="form-label">
+                                    Blood Type
+                                    <input type="text" name="bloodType" />
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Allergies
+                                    <textarea name="allergies" rows="3"></textarea>
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Medical Conditions
+                                    <textarea name="conditions" rows="3"></textarea>
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Medications
+                                    <textarea name="medications" rows="3"></textarea>
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Emergency Contact
+                                    <input type="text" name="emergencyContact" />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="profile-section hidden" id="doctor-profile-section">
+                            <h2>Professional Information</h2>
+
+                            <div class="profile-grid">
+                                <label class="form-label">
+                                    Doctor Type
+                                    <input type="text" name="specialty" />
+                                </label>
+
+                                <label class="form-label">
+                                    Phone
+                                    <input type="text" name="phone" />
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Contact Email
+                                    <input type="email" name="contactEmail" />
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Workplace
+                                    <input type="text" name="workplace" />
+                                </label>
+
+                                <label class="form-label profile-full">
+                                    Address
+                                    <textarea name="address" rows="3"></textarea>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="profile-actions">
+                            <button class="form-btn profile-save-btn" type="submit" id="profile-save-btn" disabled>Save Changes</button>
+                        </div>
+
+                    </form>
+
                     <div class="records-table-list">
 
                         <table class="records-table">
@@ -565,12 +678,114 @@
 
 
 
+            <div class="modal-overlay hidden" id="relationship-modal">
+
+                <div class="upload-modal">
+
+                    <div class="upload-modal-header">
+                        <h2 id="relationship-modal-title">Add Doctor</h2>
+
+                        <button class="modal-close-btn" type="button" id="relationship-modal-close">
+                            <span class="material-icons">close</span>
+                        </button>
+                    </div>
+
+                    <div class="alert error hidden upload-error" id="relationship-error">
+                        <span class="material-icons">error_outline</span>
+                        <span class="msg-error-text"></span>
+                    </div>
+
+                    <label class="record-search relationship-search">
+                        <span class="material-icons">search</span>
+                        <input type="search" id="relationship-search-input" placeholder="Search" />
+                        <button class="search-clear-btn hidden" type="button" id="relationship-search-clear-btn" aria-label="Clear search">
+                            <span class="material-icons">close</span>
+                        </button>
+                    </label>
+
+                    <div class="relationship-list" id="relationship-list"></div>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="modal-overlay hidden" id="profile-password-modal">
+
+                <div class="upload-modal">
+
+                    <div class="upload-modal-header">
+                        <h2>Change Password</h2>
+
+                        <button class="modal-close-btn" type="button" id="profile-password-close">
+                            <span class="material-icons">close</span>
+                        </button>
+                    </div>
+
+                    <div class="alert error hidden upload-error" id="profile-password-error">
+                        <span class="material-icons">error_outline</span>
+                        <span class="msg-error-text"></span>
+                    </div>
+
+                    <div class="alert success hidden upload-error" id="profile-password-success">
+                        <span class="material-icons">check_circle_outline</span>
+                        <span class="msg-success-text"></span>
+                    </div>
+
+                    <form class="upload-document-form" id="profile-password-code-form">
+                        <p class="form-description profile-modal-description">
+                            We will send a verification code to your email before you can change your password.
+                        </p>
+
+                        <button class="form-btn" type="submit">Send Verification Code</button>
+                    </form>
+
+                    <form class="upload-document-form hidden" id="profile-password-verify-form">
+                        <label class="form-label">
+                            Verification Code
+                            <input type="number" name="code" required />
+                        </label>
+
+                        <button class="form-btn" type="submit">Verify Code</button>
+                    </form>
+
+                    <form class="upload-document-form hidden" id="profile-password-change-form">
+                        <label class="form-label">
+                            New Password
+                            <div class="password-field">
+                                <input type="password" name="newPassword" class="password-input" required />
+                                <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false">
+                                    <span class="material-icons">visibility_off</span>
+                                </button>
+                            </div>
+                        </label>
+
+                        <label class="form-label">
+                            Confirm Password
+                            <div class="password-field">
+                                <input type="password" name="confirmPassword" class="password-input" required />
+                                <button type="button" class="password-toggle" aria-label="Show password" aria-pressed="false">
+                                    <span class="material-icons">visibility_off</span>
+                                </button>
+                            </div>
+                        </label>
+
+                        <button class="form-btn" type="submit">Update Password</button>
+                    </form>
+
+                </div>
+
+            </div>
+
+
+
             <div class="modal-overlay hidden" id="upload-modal">
 
                 <div class="upload-modal">
 
                     <div class="upload-modal-header">
-                        <h2>Upload Document</h2>
+                        <h2 id="upload-modal-title">Upload Document</h2>
 
                         <button class="modal-close-btn" type="button" id="upload-modal-close">
                             <span class="material-icons">close</span>
